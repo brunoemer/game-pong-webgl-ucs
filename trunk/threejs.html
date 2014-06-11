@@ -13,14 +13,17 @@ canvas { width: 100%; height: 100% }
 <script src="js/libs/stats.min.js"></script>
 <script>
 var scene, camera, renderer, container;
-var cube, cube2, sphere;
+var cube, cube2, spheres = [];
+var key = [];
 var controls;
 var stats;
-var direction_x = 0; //0 left, 1 right
-var direction_z = 0; //0 top, 1 down
+
+var cube_width_z = 100;
 var limit_x = 280;
 var limit_z = 200;
-var speed = 5, speed_bar = 4;
+var speed = 5, speed_cube = 5;
+var direction_x = []; //0 left, 1 right
+var direction_z = []; //0 top, 1 down
 
 function init(){
 	// scene
@@ -58,7 +61,7 @@ function init(){
 	var floorMaterial = new THREE.MeshBasicMaterial( { color: 0x444444, side: THREE.DoubleSide } );
 	var floorGeometry = new THREE.PlaneGeometry(limit_x*2, limit_z*2, 1, 1);
 	var floor = new THREE.Mesh(floorGeometry, floorMaterial);
-	floor.position.y = -7;
+	floor.position.y = -8;
 	floor.rotation.x = Math.PI / 2;
 	scene.add(floor);
 
@@ -68,17 +71,17 @@ function init(){
 	var skyBox = new THREE.Mesh(skyBoxGeometry, skyBoxMaterial);
 	scene.add(skyBox);
 
-	// cube
-	var cposition = new THREE.Vector3(230, 4, 0);
-	var geometry = new THREE.CubeGeometry(10,20,100);
+	// cubes
+	var cposition = new THREE.Vector3(230, 3, 0);
+	var geometry = new THREE.CubeGeometry(10,20,cube_width_z);
 	var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5}); 
 	cube = new THREE.Mesh(geometry, material); 
 	cube.position = cposition;
 	scene.add(cube);
 	THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(cube));
 	
-	var cposition = new THREE.Vector3(-230, 4, 0);
-	var geometry = new THREE.CubeGeometry(10,20,100);
+	var cposition = new THREE.Vector3(-230, 3, 0);
+	var geometry = new THREE.CubeGeometry(10,20,cube_width_z);
 	var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5}); 
 	cube2 = new THREE.Mesh(geometry, material); 
 	cube2.position = cposition;
@@ -86,16 +89,7 @@ function init(){
 	THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(cube2));
 	
 	// sphere
-	var rad = 7;
-	var sposition = new THREE.Vector3(0, 0, 0);
-	var geometry = new THREE.SphereGeometry(rad, 30, 30);
-	var material = new THREE.MeshLambertMaterial({color: 0x000088}); 
-	sphere = new THREE.Mesh(geometry, material); 
-	sphere.position = sposition;
-	scene.add(sphere);
-	var sc = new THREE.SphereCollider(sposition, rad);
-	sc.mesh = sphere;
-	THREE.Collisions.colliders.push(sc);
+	addSphere();
 
 	// stats - fps
 	stats = new Stats();
@@ -104,24 +98,26 @@ function init(){
 	container.appendChild(stats.domElement);
 
 	// events
-	document.addEventListener("keydown", function(event){
-		//console.log(event.keyCode);
-		if(event.keyCode == '37'){ //esquerda
-			//cube.position.x -= 1;
-		}else if(event.keyCode == '38'){ //cima
-			cube.position.z -= speed_bar;
-		}else if(event.keyCode == '39'){ //direita
-			//cube.position.x += 1;
+	document.body.onkeydown = document.body.onkeyup = function(e){
+		var e = e || event;
+		key[e.keyCode] = e.type == 'keydown';
+	};
+	/*document.addEventListener("keydown", function(event){
+		if(event.keyCode == '38'){ //cima
+			cube.position.z -= speed_cube;
 		}else if(event.keyCode == '40'){ //baixo
-			cube.position.z += speed_bar;
-		}else if(event.keyCode == '33'){ //page up
+			cube.position.z += speed_cube;
+		}
+		if(event.keyCode == '33'){ //page up
 			cube.rotation.y += .1;
-		}else if(event.keyCode == '34'){ //page down
+		}
+		if(event.keyCode == '34'){ //page down
 			cube.rotation.y -= .1;
-		}else if(event.keyCode == '87'){ //w cima
-			cube2.position.z -= speed_bar;
+		}
+		if(event.keyCode == '87'){ //w cima
+			cube2.position.z -= speed_cube;
 		}else if(event.keyCode == '83'){ //s baixo
-			cube2.position.z += speed_bar;
+			cube2.position.z += speed_cube;
 		}
 
 	}, false);
@@ -131,47 +127,98 @@ function init(){
 	renderer.domElement.addEventListener('mousedown', function(event){
 		//rotation();
 		//update();
-	});
+	});*/
 	renderer.domElement.addEventListener('mouseup', function(event){
-
+		addSphere();
 	});
 
 }
 
+function addSphere(){
+	var rad = 7;
+	var sposition = new THREE.Vector3(0, 0, 0);
+	var geometry = new THREE.SphereGeometry(rad, 30, 30);
+	var material = new THREE.MeshLambertMaterial({color: 0x000088}); 
+	var sphere = new THREE.Mesh(geometry, material); 
+	sphere.position = sposition;
+	scene.add(sphere);
+	var sc = new THREE.SphereCollider(sposition, rad);
+	sc.mesh = sphere;
+	THREE.Collisions.colliders.push(sc);
+	spheres.push(sphere);
+}
+
 function animate() {
+    //setTimeout( function() { //fps
 	requestAnimationFrame(animate);
 	update();
 	controls.update();
 	stats.update();
 	renderer.render(scene, camera);
+    //}, 1000 / 20 );
 }
 
 function update(){
-	if(direction_x == 1){
-		sphere.position.x += speed;
-	}else if(direction_x == 0){
-		sphere.position.x -= speed;
+	// events keys
+	//console.log("up="+key[38]+"; down="+key[40]+"; wup="+key[87]+"; sdown="+key[83]+";");
+	if(key[38]){ //cima
+		if(cube.position.z-(cube_width_z/2) > -limit_z){
+			cube.position.z -= speed_cube;
+		}
+	}else if(key[40]){ //baixo
+		if(cube.position.z+(cube_width_z/2) < limit_z){
+			cube.position.z += speed_cube;
+		}
 	}
-	if(direction_z == 1){
-		sphere.position.z += speed;
-	}else if(direction_z == 0){
-		sphere.position.z -= speed;
+	//if(key[33]){ //page up
+	//	cube.rotation.y += .1;
+	//}
+	//if(key[34]){ //page down
+	//	cube.rotation.y -= .1;
+	//}
+	if(key[87]){ //w cima
+		if(cube2.position.z-(cube_width_z/2) > -limit_z){
+			cube2.position.z -= speed_cube;
+		}
+	}else if(key[83]){ //s baixo
+		if(cube2.position.z+(cube_width_z/2) < limit_z){
+			cube2.position.z += speed_cube;
+		}
 	}
+	
+	// sphere move
+	var i;
+	for(i in spheres){
+		if(direction_x[i] == 1){
+			spheres[i].position.x += speed;
+		}else if(direction_x[i] != 1){
+			spheres[i].position.x -= speed;
+		}
+		if(direction_z[i] == 1){
+			spheres[i].position.z += speed;
+		}else if(direction_z[i] != 1){
+			spheres[i].position.z -= speed;
+		}
 
-	if(sphere.position.x >= limit_x || sphere.position.x <= -limit_x){
-		direction_x = direction_x == 0?1:0;
-	}
-	if(sphere.position.z >= limit_z || sphere.position.z <= -limit_z){
-		direction_z = direction_z == 0?1:0;
-	}
+		if(spheres[i].position.x >= limit_x || spheres[i].position.x <= -limit_x){
+			direction_x[i] = direction_x[i] != 1?1:0;
+			//delete spheres[i];
+			//delete direction_x[i];
+			//delete direction_z[i];
+		}
+		if(spheres[i].position.z >= limit_z || spheres[i].position.z <= -limit_z){
+			direction_z[i] = direction_z[i] != 1?1:0;
+		}
 
-	var ray = new THREE.Ray( sphere.position, new THREE.Vector3( 0, 0, 1 ) );
-	var c = THREE.Collisions.rayCastNearest( ray );
+		// colisao
+		var ray = new THREE.Ray( spheres[i].position, new THREE.Vector3( 0, 0, 1 ) );
+		var c = THREE.Collisions.rayCastNearest( ray );
 
-	var color = "0x"+((1<<24)*Math.random()|0).toString(16);
-	if(c != null && c.distance == -1){
-		direction_x = direction_x == 0?1:0;
-		c.mesh.material.color.setHex(color);
+		var color = "0x"+((1<<24)*Math.random()|0).toString(16);
+		if(c != null && c.distance == -1){
+			direction_x[i] = direction_x[i] != 1?1:0;
+			c.mesh.material.color.setHex(color);
+		}
 	}
 
 	/*var vector = new THREE.Vector3( 0, 0, 0 );
@@ -189,14 +236,6 @@ function update(){
 		console.log("sem colisao");
 	}*/
 
-}
-
-function rotation(){
-	cube.rotation.y += .05;
-
-	renderer.render(scene, camera);
-	requestAnimationFrame(rotation);
-	stats.update();
 }
 
 window.onload = function(){
