@@ -5,7 +5,8 @@
 <style type="text/css">
 	body { margin: 0px; padding: 0px; }
 	canvas { width: 100%; height: 100% }
-	.placar { position: absolute; width: 100px; height: 30px; top: 0px; background-color: #ffffff; text-align: center; }
+	.placar { position: absolute; width: 100px; height: 20px; top: 0px; background-color: #ffffff; text-align: center; }
+	.timer { position: absolute; width: 100px; height: 20px; top: 0px; left: 50%; margin-left: -50px; background-color: #ffffff; text-align: center; }
 </style> 
 <script type="text/javascript" src="js/three.min.js"></script> 
 <script type="text/javascript" src="js/OrbitControls.js"></script> 
@@ -29,6 +30,7 @@ function Game() {
 	this.scene = new THREE.Scene();
 	this.camera = new THREE.PerspectiveCamera(30, this.width / this.height, 0.1, 20000);
 	this.renderer;
+	this.webgl_available = Detector.webgl;
 	this.controls;
 	this.stats;
 	this.key = [];
@@ -38,13 +40,13 @@ function Game() {
 	this.direction_y = []; //-1 none, 0 top, 1 down
 	this.p1 = new Player();
 	this.p2 = new Player();
-	this.bonus = new Bonus();
+	this.timer = new Timer();
 
 	this.init = function() {
 		var container = document.getElementById('container');
 		// render
-		if ( Detector.webgl ){
-			this.renderer = new THREE.WebGLRenderer( {antialias:true} )
+		if ( this.webgl_available ){
+			this.renderer = new THREE.WebGLRenderer( {antialias:true} );
 		}else{
 			this.renderer = new THREE.CanvasRenderer(); 
 		}
@@ -53,6 +55,9 @@ function Game() {
 
 		// camera
 		this.camera.position.set(0,550,550);
+		if(!this.webgl_available){
+			this.camera.position.set(0,800,0);
+		}
 		this.scene.add(this.camera);
 		this.camera.lookAt(this.scene.position);
 
@@ -88,6 +93,10 @@ function Game() {
 		// sphere
 		this.addSphere();
 
+		// timer
+		this.timer = new Timer();
+		this.timer.init();
+
 		// stats - fps
 		this.stats = new Stats();
 		this.stats.domElement.style.position = 'absolute';
@@ -114,7 +123,10 @@ function Game() {
 		var rad = 7;
 		var sposition = new THREE.Vector3(0, 0, 0);
 		var geometry = new THREE.SphereGeometry(rad, 30, 30);
-		var material = new THREE.MeshLambertMaterial({color: 0x000088}); 
+		var material = new THREE.MeshLambertMaterial({color: 0x000088});
+		if(!this.webgl_available){
+			material = new THREE.MeshBasicMaterial({color: 0x000088});
+		}
 		var sphere = new THREE.Mesh(geometry, material); 
 		sphere.position = sposition;
 		this.scene.add(sphere);
@@ -139,6 +151,7 @@ function Game() {
 			this.stats.update();
 			this.renderer.render(this.scene, this.camera);
 		}else{
+			this.timer.stop();
 			alert('End game');
 		}
 	};
@@ -199,18 +212,12 @@ function Game() {
 				this.direction_x[i] = -1;
 				this.direction_z[i] = -1;
 				this.p2.makePoint();
-				this.p2.createBonus(this);
-
-				this.p2.getNextBonus().start();//teste
 			// borda esquerda
 			}else if(this.spheres[i].position.x <= -this.limit_x && this.direction_y[i] == 0){
 				this.direction_y[i] = 1;
 				this.direction_x[i] = -1;
 				this.direction_z[i] = -1;
 				this.p1.makePoint();
-				this.p1.createBonus(this);
-
-				this.p1.getNextBonus().start();//teste
 			}
 			// bordas superior e inferior
 			if(this.spheres[i].position.z >= this.limit_z || this.spheres[i].position.z <= -this.limit_z){
@@ -267,7 +274,10 @@ function Player() {
 	this.makeCube = function(position_x, scene) {
 		var cposition = new THREE.Vector3(position_x, 3, 0);
 		var geometry = new THREE.CubeGeometry(10,20,this.cube_width_z);
-		var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5}); 
+		var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5});
+		if(!this.webgl_available){
+			material = new THREE.MeshBasicMaterial({color: 0x000088});
+		}
 		this.cube = new THREE.Mesh(geometry, material); 
 		this.cube.position = cposition;
 		scene.add(this.cube);
@@ -289,7 +299,13 @@ function Player() {
 
 	this.makePoint = function(){
 		this.points++;
-		
+
+		// gera bonus a cada 3 pontos
+		if(this.points % 3 == 0){
+			this.createBonus();
+			this.getNextBonus().start();//teste remover
+		}
+
 		this.div_placar.innerHTML = this.points;
 	};
 
@@ -304,21 +320,21 @@ function Player() {
 
 /**
 Regras:
--Adiciona bolinha apos 30 sec
--Bonus a cada 3 pontos
--Bonus para 2 players a cada 1 minuto
+-Adiciona bonus 1 apos 30 sec - ok
+-Bonus a cada 3 pontos - ok
+-Bonus para 2 players a cada 1 minuto -//ver se necessario
 
 Bonus type:
-0 - cria uma bolinha
-1 - aumenta tamanho do cubo
-2 - muda direcao das bolinhas
+0 - diminui velocidade das bolinhas por 15 seg
+1 - cria uma bolinha
+2 - aumenta tamanho do cubo por 10 seg
 3 - reduz tamanho do cubo do adversario
 4 - cria 2 bolinhas
-5 - aumenta velocidade das bolinhas
+5 - aumenta velocidade das bolinhas por 15 seg
 6 - trava cubo do adversario
-7 - aumenta velocidade do cubo
+7 - aumenta velocidade do cubo por 15 seg
 8 - cria 3 bolinhas
-9 - diminui velocidade das bolinhas
+9 - muda direcao das bolinhas
 10 - ganha 2 bonus
 */
 function Bonus(player){
@@ -326,14 +342,28 @@ function Bonus(player){
 	this.type = Math.floor(Math.random() * 11);
 
 	this.start = function(){
+		//console.log("this.b" + this.type);
 		eval("this.b" + this.type)();
 	};
 
+	this.b0 = function(){
+		var speed_current = game.speed;
+		game.speed = game.speed * 1/2;
+
+		setTimeout(function(){
+			game.speed = speed_current;
+		}, 15000);
+	};
 	this.b1 = function(){
 		game.addSphere();
 	};
 	this.b2 = function(){
+		var size_current = player.cube.scale.z;
+		player.cube.scale.z = player.cube.scale.z * 2;
 
+		setTimeout(function(){
+			player.cube.scale.z = size_current;
+		}, 10000);
 	};
 	this.b3 = function(){
 		
@@ -343,13 +373,23 @@ function Bonus(player){
 		game.addSphere();
 	};
 	this.b5 = function(){
-		
+		var speed_current = game.speed;
+		game.speed = game.speed * 2;
+
+		setTimeout(function(){
+			game.speed = speed_current;
+		}, 15000);
 	};
 	this.b6 = function(){
 		
 	};
 	this.b7 = function(){
-		
+		var speed_current = player.speed_cube;
+		player.speed_cube = player.speed_cube * 2;
+
+		setTimeout(function(){
+			player.speed_cube = speed_current;
+		}, 15000);
 	};
 	this.b8 = function(){
 		game.addSphere();
@@ -357,11 +397,63 @@ function Bonus(player){
 		game.addSphere();
 	};
 	this.b9 = function(){
-		
+		for(i in game.direction_x){
+			if(game.direction_x[i] == 0){
+				game.direction_x[i] = 1;
+			}else if(game.direction_x[i] == 1){
+				game.direction_x[i] = 0;
+			}
+		}
 	};
 	this.b10 = function(){
 		this.start();
 		this.start();
+	};
+}
+
+function Timer(){
+	this.totalSeconds = 0;
+	this.timer;
+	this.label;
+
+	this.init = function(){
+		this.label = document.createElement('div');
+		this.label.className = "timer";
+		document.body.appendChild(this.label);
+
+		this.start();
+	};
+
+	this.start = function() {
+		(function(obj){
+			this.timer = setInterval(function(){
+				obj.setTimeUpdate();
+			}, 1000);
+		})(this);
+	};
+
+	this.stop = function() {
+		clearInterval(this.timer);
+	};
+
+	this.setTimeUpdate = function() {
+		++this.totalSeconds;
+		var m = this.padstr(parseInt(this.totalSeconds / 60));
+		var s = this.padstr(this.totalSeconds % 60);
+		this.label.innerHTML = m + ":" + s;
+
+		if(m == 0 && s == 30){
+			game.addSphere();
+		}
+	};
+
+	this.padstr = function(val) {
+		var valString = val + "";
+		if(valString.length < 2) {
+			return "0" + valString;
+		} else {
+			return valString;
+		}
 	};
 }
 
