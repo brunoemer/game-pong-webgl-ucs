@@ -1,17 +1,25 @@
 <html> 
 <head> 
-<title></title> 
-<style>
-body { margin: 0px; padding: 0px; }
-canvas { width: 100%; height: 100% }
+<title>WebGL Game - Computação gráfica</title> 
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+<style type="text/css">
+	body { margin: 0px; padding: 0px; }
+	canvas { width: 100%; height: 100% }
+	.placar { position: absolute; width: 100px; height: 30px; top: 0px; background-color: #ffffff; text-align: center; }
 </style> 
-<script src="js/three.min.js"></script> 
-<script src="js/OrbitControls.js"></script> 
-<script src="js/Detector.js"></script> 
-<script src="js/CollisionUtils.js"></script>
-<script src="js/Collisions.js"></script>
-<script src="js/libs/stats.min.js"></script>
-<script>
+<script type="text/javascript" src="js/three.min.js"></script> 
+<script type="text/javascript" src="js/OrbitControls.js"></script> 
+<script type="text/javascript" src="js/Detector.js"></script> 
+<script type="text/javascript" src="js/CollisionUtils.js"></script>
+<script type="text/javascript" src="js/Collisions.js"></script>
+<script type="text/javascript" src="js/libs/stats.min.js"></script>
+<script type="text/javascript">
+var game;
+window.onload = function(){
+	game = new Game();
+	game.init();
+}
+
 function Game() {
 	this.speed = 5;
 	this.limit_x = 280;
@@ -25,8 +33,15 @@ function Game() {
 	this.stats;
 	this.key = [];
 	this.spheres = [];
+	this.direction_x = []; //0 left, 1 right
+	this.direction_z = []; //0 top, 1 down
+	this.direction_y = []; //-1 none, 0 top, 1 down
+	this.p1 = new Player();
+	this.p2 = new Player();
+	this.bonus = new Bonus();
 
 	this.init = function() {
+		var container = document.getElementById('container');
 		// render
 		if ( Detector.webgl ){
 			this.renderer = new THREE.WebGLRenderer( {antialias:true} )
@@ -67,22 +82,9 @@ function Game() {
 		this.scene.add(skyBox);
 
 		// cubes
-		var cposition = new THREE.Vector3(230, 3, 0);
-		var geometry = new THREE.CubeGeometry(10,20,cube_width_z);
-		var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5}); 
-		cube = new THREE.Mesh(geometry, material); 
-		cube.position = cposition;
-		this.scene.add(cube);
-		THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(cube));
-	
-		var cposition = new THREE.Vector3(-230, 3, 0);
-		var geometry = new THREE.CubeGeometry(10,20,cube_width_z);
-		var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5}); 
-		cube2 = new THREE.Mesh(geometry, material); 
-		cube2.position = cposition;
-		this.scene.add(cube2);
-		THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(cube2));
-	
+		this.p1.makeCube(230, this.scene);
+		this.p2.makeCube(-230, this.scene);
+
 		// sphere
 		this.addSphere();
 
@@ -119,83 +121,120 @@ function Game() {
 		var sc = new THREE.SphereCollider(sposition, rad);
 		sc.mesh = sphere;
 		THREE.Collisions.colliders.push(sc);
-		var len = this.spheres.push(sphere);
-		direction_x[len-1] = Math.round(Math.random());
-		direction_z[len-1] = Math.round(Math.random());
+		var len = this.spheres.push(sphere) - 1;
+		this.direction_x[len] = Math.round(Math.random());
+		this.direction_z[len] = Math.round(Math.random());
+		this.direction_y[len] = 0;
 	};
 
 	this.animate = function() {
-		(function(obj){
-			requestAnimationFrame(function(){
-				obj.animate();
-			});
-		})(this);
-		this.update();
-		this.controls.update();
-		this.stats.update();
-		this.renderer.render(this.scene, this.camera);
+		if(this.spheres.length > 0){
+			(function(obj){
+				requestAnimationFrame(function(){
+					obj.animate();
+				});
+			})(this);
+			this.update();
+			this.controls.update();
+			this.stats.update();
+			this.renderer.render(this.scene, this.camera);
+		}else{
+			alert('End game');
+		}
 	};
 
 	this.update = function() {
 		// events keys
 		//console.log("up="+this.key[38]+"; down="+this.key[40]+"; wup="+this.key[87]+"; sdown="+this.key[83]+";");
 		if(this.key[38]){ //cima
-			if(cube.position.z-(cube_width_z/2) > -this.limit_z){
-				cube.position.z -= speed_cube;
+			if(this.p1.cube.position.z-(this.p1.cube_width_z/2) > -this.limit_z){
+				this.p1.cube.position.z -= this.p1.speed_cube;
 			}
 		}else if(this.key[40]){ //baixo
-			if(cube.position.z+(cube_width_z/2) < this.limit_z){
-				cube.position.z += speed_cube;
+			if(this.p1.cube.position.z+(this.p1.cube_width_z/2) < this.limit_z){
+				this.p1.cube.position.z += this.p1.speed_cube;
 			}
 		}
 		if(this.key[33]){ //page up
-			cube.rotation.y += .1;
+			this.p1.cube.rotation.y += .1;
 		}
 		if(this.key[34]){ //page down
-			cube.rotation.y -= .1;
+			this.p1.cube.rotation.y -= .1;
 		}
 		if(this.key[87]){ //w cima
-			if(cube2.position.z-(cube_width_z/2) > -this.limit_z){
-				cube2.position.z -= speed_cube;
+			if(this.p2.cube.position.z-(this.p2.cube_width_z/2) > -this.limit_z){
+				this.p2.cube.position.z -= this.p2.speed_cube;
 			}
 		}else if(this.key[83]){ //s baixo
-			if(cube2.position.z+(cube_width_z/2) < this.limit_z){
-				cube2.position.z += speed_cube;
+			if(this.p2.cube.position.z+(this.p2.cube_width_z/2) < this.limit_z){
+				this.p2.cube.position.z += this.p2.speed_cube;
 			}
 		}
-	
+		if(this.key[81]){ //q
+			this.p2.cube.rotation.y += .1;
+		}
+		if(this.key[69]){ //e
+			this.p2.cube.rotation.y -= .1;
+		}
+
 		// sphere move
-		var i;
+		var i, s;
 		for(i in this.spheres){
-			if(direction_x[i] == 1){
+			if(this.direction_x[i] == 1){
 				this.spheres[i].position.x += this.speed;
-			}else if(direction_x[i] != 1){
+			}else if(this.direction_x[i] == 0){
 				this.spheres[i].position.x -= this.speed;
+			}else if(this.direction_y[i] == 1){
+				this.spheres[i].position.y -= this.speed*3;
 			}
-			if(direction_z[i] == 1){
+			if(this.direction_z[i] == 1){
 				this.spheres[i].position.z += this.speed;
-			}else if(direction_z[i] != 1){
+			}else if(this.direction_z[i] == 0){
 				this.spheres[i].position.z -= this.speed;
 			}
 
-			if(this.spheres[i].position.x >= this.limit_x || this.spheres[i].position.x <= -this.limit_x){
-				direction_x[i] = direction_x[i] != 1?1:0;
-				//delete this.spheres[i];
-				//delete direction_x[i];
-				//delete direction_z[i];
+			// borda direita
+			if(this.spheres[i].position.x >= this.limit_x && this.direction_y[i] == 0){
+				this.direction_y[i] = 1;
+				this.direction_x[i] = -1;
+				this.direction_z[i] = -1;
+				this.p2.makePoint();
+				this.p2.createBonus(this);
+
+				this.p2.getNextBonus().start();//teste
+			// borda esquerda
+			}else if(this.spheres[i].position.x <= -this.limit_x && this.direction_y[i] == 0){
+				this.direction_y[i] = 1;
+				this.direction_x[i] = -1;
+				this.direction_z[i] = -1;
+				this.p1.makePoint();
+				this.p1.createBonus(this);
+
+				this.p1.getNextBonus().start();//teste
 			}
+			// bordas superior e inferior
 			if(this.spheres[i].position.z >= this.limit_z || this.spheres[i].position.z <= -this.limit_z){
-				direction_z[i] = direction_z[i] != 1?1:0;
+				this.direction_z[i] = this.direction_z[i] != 1?1:0;
+			}
+			// cair
+			if(this.direction_y[i] == 1 && this.spheres[i].position.y < -2000){
+				s = this.spheres[i];
+				this.spheres.splice(i, 1);
+				this.direction_x.splice(i, 1);
+				this.direction_y.splice(i, 1);
+				this.direction_z.splice(i, 1);
+				//delete this.spheres[i];
+				this.scene.remove(s);
 			}
 
 			// colisao
 			var ray = new THREE.Ray( this.spheres[i].position, new THREE.Vector3( 0, 0, 1 ) );
 			var c = THREE.Collisions.rayCastNearest( ray );
 
-			var color = "0x"+((1<<24)*Math.random()|0).toString(16);
+			//var color = "0x"+((1<<24)*Math.random()|0).toString(16);
 			if(c != null && c.distance == -1){
-				direction_x[i] = direction_x[i] != 1?1:0;
-				c.mesh.material.color.setHex(color);
+				this.direction_x[i] = this.direction_x[i] != 1?1:0;
+				//c.mesh.material.color.setHex(color);
 			}
 		}
 
@@ -217,29 +256,113 @@ function Game() {
 	}
 }
 
-
-var cube_width_z = 100;
-var speed_cube = 5;
-var cube, cube2;
-var direction_x = []; //0 left, 1 right
-var direction_z = []; //0 top, 1 down
-
 function Player() {
 	this.cube;
-	this.cubeWidth = 100;
+	this.cube_width_z = 100;
+	this.speed_cube = 5;
 	this.points = 0;
+	this.div_placar;
+	this.bonus_list = [];
 
+	this.makeCube = function(position_x, scene) {
+		var cposition = new THREE.Vector3(position_x, 3, 0);
+		var geometry = new THREE.CubeGeometry(10,20,this.cube_width_z);
+		var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5}); 
+		this.cube = new THREE.Mesh(geometry, material); 
+		this.cube.position = cposition;
+		scene.add(this.cube);
+		THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(this.cube));
 
-	this.makeCube = function() {
+		this.makePlacar(position_x);
+	};
 
-	}
+	this.makePlacar = function(position_x){
+		this.div_placar = document.createElement('div');
+		this.div_placar.className = "placar";
+		if(position_x < 0){
+			this.div_placar.style.left = -position_x-50;
+		}else{
+			this.div_placar.style.right = position_x-50;
+		}
+		document.body.appendChild(this.div_placar);
+	};
 
+	this.makePoint = function(){
+		this.points++;
+		
+		this.div_placar.innerHTML = this.points;
+	};
+
+	this.createBonus = function(){
+		this.bonus_list.push(new Bonus(this));
+	};
+
+	this.getNextBonus = function(){
+		return this.bonus_list.shift();
+	};
 }
 
-window.onload = function(){
-	var container = document.getElementById('container');
-	var g = new Game();
-	g.init();
+/**
+Regras:
+-Adiciona bolinha apos 30 sec
+-Bonus a cada 3 pontos
+-Bonus para 2 players a cada 1 minuto
+
+Bonus type:
+0 - cria uma bolinha
+1 - aumenta tamanho do cubo
+2 - muda direcao das bolinhas
+3 - reduz tamanho do cubo do adversario
+4 - cria 2 bolinhas
+5 - aumenta velocidade das bolinhas
+6 - trava cubo do adversario
+7 - aumenta velocidade do cubo
+8 - cria 3 bolinhas
+9 - diminui velocidade das bolinhas
+10 - ganha 2 bonus
+*/
+function Bonus(player){
+	this.player = player;
+	this.type = Math.floor(Math.random() * 11);
+
+	this.start = function(){
+		eval("this.b" + this.type)();
+	};
+
+	this.b1 = function(){
+		game.addSphere();
+	};
+	this.b2 = function(){
+
+	};
+	this.b3 = function(){
+		
+	};
+	this.b4 = function(){
+		game.addSphere();
+		game.addSphere();
+	};
+	this.b5 = function(){
+		
+	};
+	this.b6 = function(){
+		
+	};
+	this.b7 = function(){
+		
+	};
+	this.b8 = function(){
+		game.addSphere();
+		game.addSphere();
+		game.addSphere();
+	};
+	this.b9 = function(){
+		
+	};
+	this.b10 = function(){
+		this.start();
+		this.start();
+	};
 }
 
 /*
@@ -263,6 +386,6 @@ window.onload = function(){
 </script> 
 </head> 
 <body>
-<div id="container"></div>
+	<div id="container"></div>
 </body> 
 </html>
