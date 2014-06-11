@@ -13,10 +13,14 @@ canvas { width: 100%; height: 100% }
 <script src="js/libs/stats.min.js"></script>
 <script>
 var scene, camera, renderer, container;
-var cube, sphere;
+var cube, cube2, sphere;
 var controls;
 var stats;
-var direction = 1; //0 right, 1 left, 2 top, 3 down
+var direction_x = 0; //0 left, 1 right
+var direction_z = 0; //0 top, 1 down
+var limit_x = 280;
+var limit_z = 200;
+var speed = 5, speed_bar = 4;
 
 function init(){
 	// scene
@@ -34,8 +38,8 @@ function init(){
 	container.appendChild(renderer.domElement);
 
 	// camera
-	camera = new THREE.PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 20000);
-	camera.position.set(0,30,10);
+	camera = new THREE.PerspectiveCamera(30, WIDTH / HEIGHT, 0.1, 20000);
+	camera.position.set(0,550,550);
 	scene.add(camera);
 	camera.lookAt(scene.position);
 
@@ -52,9 +56,9 @@ function init(){
 
 	// floor
 	var floorMaterial = new THREE.MeshBasicMaterial( { color: 0x444444, side: THREE.DoubleSide } );
-	var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 1, 1);
+	var floorGeometry = new THREE.PlaneGeometry(limit_x*2, limit_z*2, 1, 1);
 	var floor = new THREE.Mesh(floorGeometry, floorMaterial);
-	floor.position.y = -1.1;
+	floor.position.y = -7;
 	floor.rotation.x = Math.PI / 2;
 	scene.add(floor);
 
@@ -65,27 +69,27 @@ function init(){
 	scene.add(skyBox);
 
 	// cube
-	var cposition = new THREE.Vector3(-15, 0, 0);
-	var geometry = new THREE.CubeGeometry(1,2,8);
+	var cposition = new THREE.Vector3(230, 4, 0);
+	var geometry = new THREE.CubeGeometry(10,20,100);
 	var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5}); 
 	cube = new THREE.Mesh(geometry, material); 
 	cube.position = cposition;
 	scene.add(cube);
 	THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(cube));
 	
-	var cposition = new THREE.Vector3(15, 0, 0);
-	var geometry = new THREE.CubeGeometry(1,2,8);
+	var cposition = new THREE.Vector3(-230, 4, 0);
+	var geometry = new THREE.CubeGeometry(10,20,100);
 	var material = new THREE.MeshLambertMaterial({color: 0x000088, opacity: 0.5}); 
-	cube = new THREE.Mesh(geometry, material); 
-	cube.position = cposition;
-	scene.add(cube);
-	THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(cube));
+	cube2 = new THREE.Mesh(geometry, material); 
+	cube2.position = cposition;
+	scene.add(cube2);
+	THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(cube2));
 	
 	// sphere
-	var rad = 1.0;
+	var rad = 7;
 	var sposition = new THREE.Vector3(0, 0, 0);
-	var geometry = new THREE.SphereGeometry(rad, 50, 50);
-	var material = new THREE.MeshLambertMaterial({color: 0x008800}); 
+	var geometry = new THREE.SphereGeometry(rad, 30, 30);
+	var material = new THREE.MeshLambertMaterial({color: 0x000088}); 
 	sphere = new THREE.Mesh(geometry, material); 
 	sphere.position = sposition;
 	scene.add(sphere);
@@ -103,17 +107,21 @@ function init(){
 	document.addEventListener("keydown", function(event){
 		//console.log(event.keyCode);
 		if(event.keyCode == '37'){ //esquerda
-			cube.position.x -= 1;
+			//cube.position.x -= 1;
 		}else if(event.keyCode == '38'){ //cima
-			cube.position.z -= 1;
+			cube.position.z -= speed_bar;
 		}else if(event.keyCode == '39'){ //direita
-			cube.position.x += 1;
+			//cube.position.x += 1;
 		}else if(event.keyCode == '40'){ //baixo
-			cube.position.z += 1;
+			cube.position.z += speed_bar;
 		}else if(event.keyCode == '33'){ //page up
 			cube.rotation.y += .1;
 		}else if(event.keyCode == '34'){ //page down
 			cube.rotation.y -= .1;
+		}else if(event.keyCode == '87'){ //w cima
+			cube2.position.z -= speed_bar;
+		}else if(event.keyCode == '83'){ //s baixo
+			cube2.position.z += speed_bar;
 		}
 
 	}, false);
@@ -122,8 +130,7 @@ function init(){
 	});
 	renderer.domElement.addEventListener('mousedown', function(event){
 		//rotation();
-		update();
-
+		//update();
 	});
 	renderer.domElement.addEventListener('mouseup', function(event){
 
@@ -133,30 +140,38 @@ function init(){
 
 function animate() {
 	requestAnimationFrame(animate);
-	renderer.render(scene, camera);
+	update();
 	controls.update();
 	stats.update();
-	//update();
+	renderer.render(scene, camera);
 }
 
 function update(){
+	if(direction_x == 1){
+		sphere.position.x += speed;
+	}else if(direction_x == 0){
+		sphere.position.x -= speed;
+	}
+	if(direction_z == 1){
+		sphere.position.z += speed;
+	}else if(direction_z == 0){
+		sphere.position.z -= speed;
+	}
+
+	if(sphere.position.x >= limit_x || sphere.position.x <= -limit_x){
+		direction_x = direction_x == 0?1:0;
+	}
+	if(sphere.position.z >= limit_z || sphere.position.z <= -limit_z){
+		direction_z = direction_z == 0?1:0;
+	}
 
 	var ray = new THREE.Ray( sphere.position, new THREE.Vector3( 0, 0, 1 ) );
 	var c = THREE.Collisions.rayCastNearest( ray );
-	if(c != null){	
-		console.log(c.distance);
-	}
-	
-	if(direction == 1){
-		sphere.position.x -= 0.5;
-		if(c != null){
-			direction = 0;
-		}
-	}else if(direction == 0){
-		sphere.position.x += 0.5;
-		if(c != null){
-		//	direction = 1;
-		}
+
+	var color = "0x"+((1<<24)*Math.random()|0).toString(16);
+	if(c != null && c.distance == -1){
+		direction_x = direction_x == 0?1:0;
+		c.mesh.material.color.setHex(color);
 	}
 
 	/*var vector = new THREE.Vector3( 0, 0, 0 );
