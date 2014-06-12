@@ -54,7 +54,7 @@ function Game() {
 		container.appendChild(this.renderer.domElement);
 
 		// camera
-		this.camera.position.set(0,550,550);
+		this.camera.position.set(0,550,750);
 		if(!this.webgl_available){
 			this.camera.position.set(0,800,0);
 		}
@@ -79,6 +79,15 @@ function Game() {
 		floor.position.y = -8;
 		floor.rotation.x = Math.PI / 2;
 		this.scene.add(floor);
+		/*var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard.jpg' );
+		floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+		floorTexture.repeat.set( 10, 10 );
+		var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+		var floorGeometry = new THREE.PlaneGeometry(this.limit_x*2, this.limit_z*2, 1, 1);
+		var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+		floor.position.y = -8;
+		floor.rotation.x = Math.PI / 2;
+		this.scene.add(floor);*/
 
 		// sky
 		var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
@@ -109,7 +118,25 @@ function Game() {
 		(function(obj){
 			document.body.onkeydown = document.body.onkeyup = function(e){
 				var e = e || event;
-				obj.key[e.keyCode] = e.type == 'keydown';
+				var keyCode = (e.keyCode ? e.keyCode : e.which);
+				obj.key[keyCode] = e.type == 'keydown';
+			};
+		})(this);
+		(function(obj){
+			document.body.onkeypress = function(e){
+				var keyCode = (e.keyCode ? e.keyCode : e.which);
+				if(keyCode == 37){ //left - usa bonus
+					var b = obj.p1.getNextBonus();
+					if(b){
+						b.start();
+					}
+				}
+				if(keyCode == 97){ //a - usa bonus
+					var b = obj.p2.getNextBonus();
+					if(b){
+						b.start();
+					}
+				}
 			};
 		})(this);
 		(function(obj){
@@ -125,9 +152,9 @@ function Game() {
 		var rad = 7;
 		var sposition = new THREE.Vector3(0, 0, 0);
 		var geometry = new THREE.SphereGeometry(rad, 30, 30);
-		var material = new THREE.MeshLambertMaterial({color: 0x000088});
+		var material = new THREE.MeshLambertMaterial({color: 0x000099});
 		if(!this.webgl_available){
-			material = new THREE.MeshBasicMaterial({color: 0x000088});
+			material = new THREE.MeshBasicMaterial({color: 0x000099});
 		}
 		var sphere = new THREE.Mesh(geometry, material); 
 		sphere.position = sposition;
@@ -160,7 +187,7 @@ function Game() {
 
 	this.update = function() {
 		// events keys
-		//console.log("up="+this.key[38]+"; down="+this.key[40]+"; wup="+this.key[87]+"; sdown="+this.key[83]+";");
+		// player 1
 		if(this.key[38]){ //cima
 			if(this.p1.cube.position.z-(this.p1.cube_width_z/2) > -this.limit_z){
 				this.p1.cube.position.z -= this.p1.speed_cube;
@@ -176,6 +203,7 @@ function Game() {
 		if(this.key[34]){ //page down
 			this.p1.cube.rotation.y -= .1;
 		}
+		// player 2
 		if(this.key[87]){ //w cima
 			if(this.p2.cube.position.z-(this.p2.cube_width_z/2) > -this.limit_z){
 				this.p2.cube.position.z -= this.p2.speed_cube;
@@ -312,31 +340,40 @@ function Player() {
 		this.points++;
 
 		// gera bonus a cada 3 pontos
-		//if(this.points % 3 == 0){
+		if(this.points % 3 == 0){
 			this.createBonus();
-			//this.getNextBonus().start();//teste remover
-		//}
+		}
 
 		this.div_placar.innerHTML = this.points;
 	};
 
 	this.createBonus = function(){
 		var b = new Bonus(this);
-		this.bonus_list.push(b);
 
 		//adiciona cubo na tela
 		var x = document.createElement("canvas");
 		var xc = x.getContext("2d");
-		x.width = x.height = 20;
+		x.width = x.height = 90;
 		//xc.shadowColor = "#ffffff";
 		//xc.shadowBlur = 7;
-		xc.fillStyle = "#00f";
-		xc.font = "15px arial";
-		xc.fillText(b.type, 4, 15);
+		xc.font = "bold 70px arial";
+		xc.textAlign = "center";
+		xc.fillStyle = "#000000";
+		xc.fillText(b.type, 40, 70);
 
-		var cposition = new THREE.Vector3(this.cube.position.x, ((this.bonus_list.length-1)*21)+2, -game.limit_z-10);
+		var darkMaterial = new THREE.MeshLambertMaterial( { map: new THREE.Texture(x), transparent: true } );
+		darkMaterial.map.needsUpdate = true;
+		var wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000088, wireframe: true, transparent: true } ); 
+		var geometry = new THREE.CubeGeometry(20, 20, 20);
+		var shape = THREE.SceneUtils.createMultiMaterialObject( geometry, [ darkMaterial, wireframeMaterial ] );
+		shape.position.set(this.cube.position.x, ((this.bonus_list.length)*21)+3, -game.limit_z-10);
+		shape.doubleSided = true;
+		game.scene.add(shape);
+
+		/*var cposition = new THREE.Vector3(this.cube.position.x, ((this.bonus_list.length-1)*21)+2, -game.limit_z-10);
                 var geometry = new THREE.CubeGeometry(20,20,20);
-                var material = new THREE.MeshLambertMaterial({color: 0xffffff, map: new THREE.Texture(x)});
+                //var material = new THREE.MeshLambertMaterial({map: new THREE.Texture(x), color: 0x000000, wireframe: true});
+                var material = new THREE.MeshLambertMaterial({map: new THREE.Texture(x)});
 		material.map.needsUpdate = true;
                 if(!game.webgl_available){
                         material = new THREE.MeshBasicMaterial({map: new THREE.Texture(x)});
@@ -345,11 +382,17 @@ function Player() {
                 var cube = new THREE.Mesh(geometry, material);
 		cube.doubleSided = true;
                 cube.position = cposition;
-                game.scene.add(cube);
+                game.scene.add(cube);*/
+
+		this.bonus_list.push({bonus: b, scene_cube: shape});
 	};
 
 	this.getNextBonus = function(){
-		return this.bonus_list.shift();
+		if(this.bonus_list.length > 0){
+			var node = this.bonus_list.shift();
+			game.scene.remove(node.scene_cube);
+			return node.bonus;
+		}
 	};
 }
 
@@ -377,7 +420,6 @@ function Bonus(player){
 	this.type = Math.floor(Math.random() * 11);
 
 	this.start = function(){
-		//console.log("this.b" + this.type);
 		eval("this.b" + this.type)();
 	};
 
@@ -501,24 +543,6 @@ function Timer(){
 		}
 	};
 }
-
-/*
-	var geometry = new THREE.SphereGeometry(1.2, 50, 50); 
-	var material = new THREE.MeshLambertMaterial({color: 0x008800}); 
-	sphere = new THREE.Mesh(geometry, material); 
-	sphere.position.x = -10;
-	this.scene.add(sphere);
-
-	var material = new THREE.LineBasicMaterial({color: 0xffffff, linewidth:2}); 
-	var geometry = new THREE.Geometry();
-	geometry.vertices.push( new THREE.Vector3( 0, 0, 0 ) ); 
-	geometry.vertices.push( new THREE.Vector3( 1, 0, 0 ) ); 
-	//geometry.vertices.push( new THREE.Vector3( 1, 0, -1 ) );
-
-//	var line = new THREE.Line( geometry, material );
-//	line.position.z = -1;
-//	this.scene.add(line); 
-*/
 
 </script> 
 </head> 
