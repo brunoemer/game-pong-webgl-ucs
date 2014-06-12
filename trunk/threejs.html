@@ -1,6 +1,6 @@
 <html> 
 <head> 
-<title>WebGL Game - Computação gráfica</title> 
+<title>Pong Game WebGL- Computação gráfica</title> 
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
 <style type="text/css">
 	body { margin: 0px; padding: 0px; }
@@ -89,6 +89,8 @@ function Game() {
 		// cubes
 		this.p1.makeCube(230, this.scene);
 		this.p2.makeCube(-230, this.scene);
+		this.p1.setOpponent(this.p2);
+		this.p2.setOpponent(this.p1);
 
 		// sphere
 		this.addSphere();
@@ -270,6 +272,7 @@ function Player() {
 	this.points = 0;
 	this.div_placar;
 	this.bonus_list = [];
+	this.opponent;
 
 	this.makeCube = function(position_x, scene) {
 		var cposition = new THREE.Vector3(position_x, 3, 0);
@@ -283,16 +286,24 @@ function Player() {
 		scene.add(this.cube);
 		THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(this.cube));
 
-		this.makePlacar(position_x);
+		this.makePlacar();
 	};
 
-	this.makePlacar = function(position_x){
+	this.setOpponent = function(o) {
+		this.opponent = o;
+	};
+
+	this.getOpponent = function(){
+		return this.opponent;
+	};
+
+	this.makePlacar = function(){
 		this.div_placar = document.createElement('div');
 		this.div_placar.className = "placar";
-		if(position_x < 0){
-			this.div_placar.style.left = -position_x-50;
+		if(this.cube.position.x < 0){
+			this.div_placar.style.left = -this.cube.position.x-50;
 		}else{
-			this.div_placar.style.right = position_x-50;
+			this.div_placar.style.right = this.cube.position.x-50;
 		}
 		document.body.appendChild(this.div_placar);
 	};
@@ -301,16 +312,40 @@ function Player() {
 		this.points++;
 
 		// gera bonus a cada 3 pontos
-		if(this.points % 3 == 0){
+		//if(this.points % 3 == 0){
 			this.createBonus();
-			this.getNextBonus().start();//teste remover
-		}
+			//this.getNextBonus().start();//teste remover
+		//}
 
 		this.div_placar.innerHTML = this.points;
 	};
 
 	this.createBonus = function(){
-		this.bonus_list.push(new Bonus(this));
+		var b = new Bonus(this);
+		this.bonus_list.push(b);
+
+		//adiciona cubo na tela
+		var x = document.createElement("canvas");
+		var xc = x.getContext("2d");
+		x.width = x.height = 20;
+		//xc.shadowColor = "#ffffff";
+		//xc.shadowBlur = 7;
+		xc.fillStyle = "#00f";
+		xc.font = "15px arial";
+		xc.fillText(b.type, 4, 15);
+
+		var cposition = new THREE.Vector3(this.cube.position.x, ((this.bonus_list.length-1)*21)+2, -game.limit_z-10);
+                var geometry = new THREE.CubeGeometry(20,20,20);
+                var material = new THREE.MeshLambertMaterial({color: 0xffffff, map: new THREE.Texture(x)});
+		material.map.needsUpdate = true;
+                if(!game.webgl_available){
+                        material = new THREE.MeshBasicMaterial({map: new THREE.Texture(x)});
+			material.map.needsUpdate = true;
+                }
+                var cube = new THREE.Mesh(geometry, material);
+		cube.doubleSided = true;
+                cube.position = cposition;
+                game.scene.add(cube);
 	};
 
 	this.getNextBonus = function(){
@@ -328,10 +363,10 @@ Bonus type:
 0 - diminui velocidade das bolinhas por 15 seg
 1 - cria uma bolinha
 2 - aumenta tamanho do cubo por 10 seg
-3 - reduz tamanho do cubo do adversario
+3 - reduz tamanho do cubo do adversario por 10 seg
 4 - cria 2 bolinhas
 5 - aumenta velocidade das bolinhas por 15 seg
-6 - trava cubo do adversario
+6 - trava cubo do adversario por 5 seg
 7 - aumenta velocidade do cubo por 15 seg
 8 - cria 3 bolinhas
 9 - muda direcao das bolinhas
@@ -366,7 +401,12 @@ function Bonus(player){
 		}, 10000);
 	};
 	this.b3 = function(){
-		
+		var size_current = player.opponent.cube.scale.z;
+                player.opponent.cube.scale.z = player.opponent.cube.scale.z / 2;
+
+                setTimeout(function(){
+                        player.opponent.cube.scale.z = size_current;
+                }, 10000);
 	};
 	this.b4 = function(){
 		game.addSphere();
@@ -381,7 +421,12 @@ function Bonus(player){
 		}, 15000);
 	};
 	this.b6 = function(){
-		
+		var speed_current = player.opponent.speed_cube;
+                player.opponent.speed_cube = 0;
+
+                setTimeout(function(){
+                        player.opponent.speed_cube = speed_current;
+                }, 5000);
 	};
 	this.b7 = function(){
 		var speed_current = player.speed_cube;
