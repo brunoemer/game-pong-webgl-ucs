@@ -54,7 +54,7 @@ function Game() {
 		container.appendChild(this.renderer.domElement);
 
 		// camera
-		this.camera.position.set(0,550,750);
+		this.camera.position.set(0,500,700);
 		if(!this.webgl_available){
 			this.camera.position.set(0,800,0);
 		}
@@ -197,12 +197,12 @@ function Game() {
 				this.p1.cube.position.z += this.p1.speed_cube;
 			}
 		}
-		if(this.key[33]){ //page up
-			this.p1.cube.rotation.y += .1;
-		}
-		if(this.key[34]){ //page down
-			this.p1.cube.rotation.y -= .1;
-		}
+		//if(this.key[33]){ //page up
+		//	this.p1.cube.rotation.y += .1;
+		//}
+		//if(this.key[34]){ //page down
+		//	this.p1.cube.rotation.y -= .1;
+		//}
 		// player 2
 		if(this.key[87]){ //w cima
 			if(this.p2.cube.position.z-(this.p2.cube_width_z/2) > -this.limit_z){
@@ -213,12 +213,12 @@ function Game() {
 				this.p2.cube.position.z += this.p2.speed_cube;
 			}
 		}
-		if(this.key[81]){ //q
-			this.p2.cube.rotation.y += .1;
-		}
-		if(this.key[69]){ //e
-			this.p2.cube.rotation.y -= .1;
-		}
+		//if(this.key[81]){ //q
+		//	this.p2.cube.rotation.y += .1;
+		//}
+		//if(this.key[69]){ //e
+		//	this.p2.cube.rotation.y -= .1;
+		//}
 
 		// sphere move
 		var i, s;
