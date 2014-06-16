@@ -5,8 +5,10 @@
 <style type="text/css">
 	body { margin: 0px; padding: 0px; }
 	canvas { width: 100%; height: 100% }
-	.placar { position: absolute; width: 100px; height: 20px; top: 0px; background-color: #ffffff; text-align: center; }
-	.timer { position: absolute; width: 100px; height: 20px; top: 0px; left: 50%; margin-left: -50px; background-color: #ffffff; text-align: center; }
+	.placar { position: absolute; width: 80px; height: 20px; top: 0px; background-color: #ffffff; text-align: center; }
+	.msg { position: absolute; width: 400px; height: 20px; bottom: 0px; background-color: #ffffff; text-align: left; }
+	.timer { position: absolute; width: 80px; height: 20px; top: 0px; left: 50%; margin-left: -40px; background-color: #ffffff; text-align: center; }
+	.screen { position: absolute; width: 600px; height: 500px; top: 50%; left: 50%; margin-left: -300px; margin-top: -250px; background-color: #ffffff; text-align: left; padding: 5px; }
 </style> 
 <script type="text/javascript" src="js/three.min.js"></script> 
 <script type="text/javascript" src="js/OrbitControls.js"></script> 
@@ -19,6 +21,32 @@ var game;
 window.onload = function(){
 	game = new Game();
 	game.init();
+
+	var screen = document.createElement('div');
+	screen.id = "screen";
+	screen.className = "screen";
+	screen.innerHTML = 
+		"<b>Instruções:</b><br>" +
+		"Player 1:<br>" +
+		"Seta cima/baixo para movimentar<br>" +
+		"Seta esquerda para usar os bonus<br>" +
+		"Player 2:<br>" +
+		"Tecla 'w'/'s' para movimentar<br>" +
+		"Tecla 'a' para usar os bonus<br>" +
+		"<br><b>Bonus:</b><br>" + 
+		"-Adiciona bonus 1 apos 30 sec<br>" + 
+		"-Bonus a cada 3 pontos<br>" +
+		"Tipos:<br>";
+	for(i in BonusDescription){
+		screen.innerHTML += i + " - " + BonusDescription[i] + '<br>';
+	}
+	screen.innerHTML += "<input type='button' value='Iniciar' id='iniciar'>";
+	document.body.appendChild(screen);
+	document.getElementById('iniciar').onclick = function(){
+		game.start();
+		document.getElementById('screen').style.display = 'none';
+	}
+
 }
 
 function Game() {
@@ -95,24 +123,17 @@ function Game() {
 		var skyBox = new THREE.Mesh(skyBoxGeometry, skyBoxMaterial);
 		this.scene.add(skyBox);
 
-		// cubes
-		this.p1.makeCube(230, this.scene);
-		this.p2.makeCube(-230, this.scene);
-		this.p1.setOpponent(this.p2);
-		this.p2.setOpponent(this.p1);
-
-		// sphere
-		this.addSphere();
-
-		// timer
-		this.timer = new Timer();
-		this.timer.init();
-
 		// stats - fps
 		this.stats = new Stats();
 		this.stats.domElement.style.position = 'absolute';
 		this.stats.domElement.style.top = '0px';
 		container.appendChild(this.stats.domElement);
+
+		// cubes
+		this.p1.makeCube(230, this.scene);
+		this.p2.makeCube(-230, this.scene);
+		this.p1.setOpponent(this.p2);
+		this.p2.setOpponent(this.p1);
 
 		// events
 		(function(obj){
@@ -144,6 +165,20 @@ function Game() {
 				obj.addSphere();
 			});
 		})(this);
+	};
+
+	this.start = function() {
+		this.p1.makePlacar();
+		this.p2.makePlacar();
+		this.p1.makeMsg();
+		this.p2.makeMsg();
+
+		// sphere
+		this.addSphere();
+
+		// timer
+		this.timer = new Timer();
+		this.timer.init();
 
 		this.animate();
 	};
@@ -181,7 +216,17 @@ function Game() {
 			this.renderer.render(this.scene, this.camera);
 		}else{
 			this.timer.stop();
-			alert('End game');
+			if(this.p1.points > this.p2.points){
+				this.p1.div_msg.innerHTML = "Você ganhou!";
+				this.p2.div_msg.innerHTML = "Você perdeu!";
+			}else if(this.p1.points < this.p2.points){
+				this.p1.div_msg.innerHTML = "Você perdeu!";
+				this.p2.div_msg.innerHTML = "Você ganhou!";
+			}else{
+				this.p1.div_msg.innerHTML = "Ninguém ganhou!";
+				this.p2.div_msg.innerHTML = "Ninguém ganhou!";
+			}
+			//alert('End game');
 		}
 	};
 
@@ -301,6 +346,7 @@ function Player() {
 	this.div_placar;
 	this.bonus_list = [];
 	this.opponent;
+	this.div_msg;
 
 	this.makeCube = function(position_x, scene) {
 		var cposition = new THREE.Vector3(position_x, 3, 0);
@@ -314,7 +360,6 @@ function Player() {
 		scene.add(this.cube);
 		THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(this.cube));
 
-		this.makePlacar();
 	};
 
 	this.setOpponent = function(o) {
@@ -333,6 +378,7 @@ function Player() {
 		}else{
 			this.div_placar.style.right = this.cube.position.x-50;
 		}
+		this.div_placar.innerHTML = this.points;
 		document.body.appendChild(this.div_placar);
 	};
 
@@ -391,30 +437,27 @@ function Player() {
 		if(this.bonus_list.length > 0){
 			var node = this.bonus_list.shift();
 			game.scene.remove(node.scene_cube);
+
+			this.div_msg.innerHTML = BonusDescription[node.bonus.type];
+
 			return node.bonus;
+		}else{
+			this.div_msg.innerHTML = "Sem bonus para utilizar";
 		}
+	};
+
+	this.makeMsg = function() {
+		this.div_msg = document.createElement('div');
+		this.div_msg.className = "msg";
+		if(this.cube.position.x < 0){
+			this.div_msg.style.left = -this.cube.position.x-230;
+		}else{
+			this.div_msg.style.right = this.cube.position.x-230;
+		}
+		document.body.appendChild(this.div_msg);
 	};
 }
 
-/**
-Regras:
--Adiciona bonus 1 apos 30 sec - ok
--Bonus a cada 3 pontos - ok
--Bonus para 2 players a cada 1 minuto -//ver se necessario
-
-Bonus type:
-0 - diminui velocidade das bolinhas por 15 seg
-1 - cria uma bolinha
-2 - aumenta tamanho do cubo por 10 seg
-3 - reduz tamanho do cubo do adversario por 10 seg
-4 - cria 2 bolinhas
-5 - aumenta velocidade das bolinhas por 15 seg
-6 - trava cubo do adversario por 5 seg
-7 - aumenta velocidade do cubo por 15 seg
-8 - cria 3 bolinhas
-9 - muda direcao das bolinhas
-10 - ganha 2 bonus
-*/
 function Bonus(player){
 	this.player = player;
 	this.type = Math.floor(Math.random() * 11);
@@ -498,6 +541,20 @@ function Bonus(player){
 	};
 }
 
+var BonusDescription = [
+	"Diminui velocidade das bolinhas por 15 seg",
+	"Cria uma bolinha",
+	"Aumenta tamanho do cubo por 10 seg",
+	"Reduz tamanho do cubo do adversario por 10 seg",
+	"Cria 2 bolinhas",
+	"Aumenta velocidade das bolinhas por 15 seg",
+	"Trava cubo do adversario por 5 seg",
+	"Aumenta velocidade do cubo por 15 seg",
+	"Cria 3 bolinhas",
+	"Muda direcao das bolinhas",
+	"Ganha 2 bonus aleatórios"
+];
+
 function Timer(){
 	this.totalSeconds = 0;
 	this.timer;
@@ -513,7 +570,7 @@ function Timer(){
 
 	this.start = function() {
 		(function(obj){
-			this.timer = setInterval(function(){
+			obj.timer = setInterval(function(){
 				obj.setTimeUpdate();
 			}, 1000);
 		})(this);
