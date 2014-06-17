@@ -6,7 +6,7 @@
 	body { margin: 0px; padding: 0px; }
 	canvas { width: 100%; height: 100% }
 	.placar { position: absolute; width: 80px; height: 20px; top: 0px; background-color: #ffffff; text-align: center; }
-	.msg { position: absolute; width: 400px; height: 20px; bottom: 0px; background-color: #ffffff; text-align: left; }
+	.msg { position: absolute; width: 400px; height: 20px; bottom: 0px; background-color: #ffffff; text-align: left; overflow: hidden }
 	.timer { position: absolute; width: 80px; height: 20px; top: 0px; left: 50%; margin-left: -40px; background-color: #ffffff; text-align: center; }
 	.screen { position: absolute; width: 600px; height: 500px; top: 50%; left: 50%; margin-left: -300px; margin-top: -250px; background-color: #ffffff; text-align: left; padding: 5px; }
 </style> 
@@ -34,7 +34,7 @@ window.onload = function(){
 		"Tecla 'w'/'s' para movimentar<br>" +
 		"Tecla 'a' para usar os bonus<br>" +
 		"<br><b>Bonus:</b><br>" + 
-		"-Adiciona bonus 1 apos 30 sec<br>" + 
+		"-Adiciona bonus a cada 30 sec<br>" + 
 		"-Bonus a cada 3 pontos<br>" +
 		"Tipos:<br>";
 	for(i in BonusDescription){
@@ -234,11 +234,11 @@ function Game() {
 		// events keys
 		// player 1
 		if(this.key[38]){ //cima
-			if(this.p1.cube.position.z-(this.p1.cube_width_z/2) > -this.limit_z){
+			if(this.p1.cube.position.z-(this.p1.cube.scale.z*this.p1.cube_width_z/2) > -this.limit_z){
 				this.p1.cube.position.z -= this.p1.speed_cube;
 			}
 		}else if(this.key[40]){ //baixo
-			if(this.p1.cube.position.z+(this.p1.cube_width_z/2) < this.limit_z){
+			if(this.p1.cube.position.z+(this.p1.cube.scale.z*this.p1.cube_width_z/2) < this.limit_z){
 				this.p1.cube.position.z += this.p1.speed_cube;
 			}
 		}
@@ -250,11 +250,11 @@ function Game() {
 		//}
 		// player 2
 		if(this.key[87]){ //w cima
-			if(this.p2.cube.position.z-(this.p2.cube_width_z/2) > -this.limit_z){
+			if(this.p2.cube.position.z-(this.p2.cube.scale.z*this.p2.cube_width_z/2) > -this.limit_z){
 				this.p2.cube.position.z -= this.p2.speed_cube;
 			}
 		}else if(this.key[83]){ //s baixo
-			if(this.p2.cube.position.z+(this.p2.cube_width_z/2) < this.limit_z){
+			if(this.p2.cube.position.z+(this.p2.cube.scale.z*this.p2.cube_width_z/2) < this.limit_z){
 				this.p2.cube.position.z += this.p2.speed_cube;
 			}
 		}
@@ -586,8 +586,10 @@ function Timer(){
 		var s = this.padstr(this.totalSeconds % 60);
 		this.label.innerHTML = m + ":" + s;
 
-		if(m == 0 && s == 30){
-			game.addSphere();
+		// gera bonus a cada 30 seg
+		if(s == 0 || s == 30){
+			game.p1.createBonus();
+			game.p2.createBonus();
 		}
 	};
 
