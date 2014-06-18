@@ -28,11 +28,11 @@ window.onload = function(){
 	screen.innerHTML = 
 		"<b>Instruções:</b><br>" +
 		"Player 1:<br>" +
-		"Seta cima/baixo para movimentar<br>" +
-		"Seta esquerda para usar os bonus<br>" +
-		"Player 2:<br>" +
 		"Tecla 'w'/'s' para movimentar<br>" +
 		"Tecla 'a' para usar os bonus<br>" +
+		"Player 2:<br>" +
+		"Tecla 'i'/'k' para movimentar<br>" +
+		"Tecla 'j' para usar os bonus<br>" +
 		"<br><b>Bonus:</b><br>" + 
 		"-Adiciona bonus a cada 30 sec<br>" + 
 		"-Bonus a cada 3 pontos<br>" +
@@ -116,6 +116,19 @@ function Game() {
 		floor.position.y = -8;
 		floor.rotation.x = Math.PI / 2;
 		this.scene.add(floor);*/
+		//laterais
+		var material = new THREE.MeshBasicMaterial( { color: 0x444444, side: THREE.DoubleSide } );
+		var geometry = new THREE.PlaneGeometry(this.limit_x*2, 16, 1, 1);
+		var side1 = new THREE.Mesh(geometry, material);
+		side1.position.z = -this.limit_z;
+		side1.rotation.x = Math.PI;
+		this.scene.add(side1);
+		var material = new THREE.MeshBasicMaterial( { color: 0x444444, side: THREE.DoubleSide } );
+		var geometry = new THREE.PlaneGeometry(this.limit_x*2, 16, 1, 1);
+		var side2 = new THREE.Mesh(geometry, material);
+		side2.position.z = this.limit_z;
+		side2.rotation.x = Math.PI;
+		this.scene.add(side2);
 
 		// sky
 		var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
@@ -130,8 +143,8 @@ function Game() {
 		container.appendChild(this.stats.domElement);
 
 		// cubes
-		this.p1.makeCube(230, this.scene);
-		this.p2.makeCube(-230, this.scene);
+		this.p1.makeCube(-230, this.scene);
+		this.p2.makeCube(230, this.scene);
 		this.p1.setOpponent(this.p2);
 		this.p2.setOpponent(this.p1);
 
@@ -146,13 +159,13 @@ function Game() {
 		(function(obj){
 			document.body.onkeypress = function(e){
 				var keyCode = (e.keyCode ? e.keyCode : e.which);
-				if(keyCode == 37){ //left - usa bonus
+				if(keyCode == 97){ //a - usa bonus
 					var b = obj.p1.getNextBonus();
 					if(b){
 						b.start();
 					}
 				}
-				if(keyCode == 97){ //a - usa bonus
+				if(keyCode == 106){ //j - usa bonus
 					var b = obj.p2.getNextBonus();
 					if(b){
 						b.start();
@@ -233,27 +246,21 @@ function Game() {
 	this.update = function() {
 		// events keys
 		// player 1
-		if(this.key[38]){ //cima
+		if(this.key[87]){ //w cima
 			if(this.p1.cube.position.z-(this.p1.cube.scale.z*this.p1.cube_width_z/2) > -this.limit_z){
 				this.p1.cube.position.z -= this.p1.speed_cube;
 			}
-		}else if(this.key[40]){ //baixo
+		}else if(this.key[83]){ //s baixo
 			if(this.p1.cube.position.z+(this.p1.cube.scale.z*this.p1.cube_width_z/2) < this.limit_z){
 				this.p1.cube.position.z += this.p1.speed_cube;
 			}
 		}
-		//if(this.key[33]){ //page up
-		//	this.p1.cube.rotation.y += .1;
-		//}
-		//if(this.key[34]){ //page down
-		//	this.p1.cube.rotation.y -= .1;
-		//}
 		// player 2
-		if(this.key[87]){ //w cima
+		if(this.key[73]){ //i cima
 			if(this.p2.cube.position.z-(this.p2.cube.scale.z*this.p2.cube_width_z/2) > -this.limit_z){
 				this.p2.cube.position.z -= this.p2.speed_cube;
 			}
-		}else if(this.key[83]){ //s baixo
+		}else if(this.key[75]){ //k baixo
 			if(this.p2.cube.position.z+(this.p2.cube.scale.z*this.p2.cube_width_z/2) < this.limit_z){
 				this.p2.cube.position.z += this.p2.speed_cube;
 			}
@@ -286,16 +293,16 @@ function Game() {
 				this.direction_y[i] = 1;
 				this.direction_x[i] = -1;
 				this.direction_z[i] = -1;
-				this.p2.makePoint();
+				this.p1.makePoint();
 			// borda esquerda
 			}else if(this.spheres[i].position.x <= -this.limit_x && this.direction_y[i] == 0){
 				this.direction_y[i] = 1;
 				this.direction_x[i] = -1;
 				this.direction_z[i] = -1;
-				this.p1.makePoint();
+				this.p2.makePoint();
 			}
 			// bordas superior e inferior
-			if(this.spheres[i].position.z >= this.limit_z || this.spheres[i].position.z <= -this.limit_z){
+			if(this.spheres[i].position.z >= this.limit_z-10 || this.spheres[i].position.z <= -this.limit_z+10){
 				this.direction_z[i] = this.direction_z[i] != 1?1:0;
 			}
 			// cair
@@ -412,7 +419,7 @@ function Player() {
 		var wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000088, wireframe: true, transparent: true } ); 
 		var geometry = new THREE.CubeGeometry(20, 20, 20);
 		var shape = THREE.SceneUtils.createMultiMaterialObject( geometry, [ darkMaterial, wireframeMaterial ] );
-		shape.position.set(this.cube.position.x, ((this.bonus_list.length)*21)+3, -game.limit_z-10);
+		shape.position.set(this.cube.position.x*1.3, ((this.bonus_list.length)*21)+3, -game.limit_z-10);
 		shape.doubleSided = true;
 		game.scene.add(shape);
 
