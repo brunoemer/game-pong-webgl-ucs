@@ -1,28 +1,99 @@
 <html> 
 <head> 
 <title>Pong Game WebGL- Computação gráfica</title> 
-<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-<style type="text/css">
-	body { margin: 0px; padding: 0px; }
-	canvas { width: 100%; height: 100% }
-	.placar { position: absolute; width: 80px; height: 20px; top: 0px; background-color: #ffffff; text-align: center; }
-	.msg { position: absolute; width: 400px; height: 20px; bottom: 0px; background-color: #ffffff; text-align: left; overflow: hidden }
-	.timer { position: absolute; width: 80px; height: 20px; top: 0px; left: 50%; margin-left: -40px; background-color: #ffffff; text-align: center; }
-	.screen { position: absolute; width: 600px; height: 500px; top: 50%; left: 50%; margin-left: -300px; margin-top: -250px; background-color: #ffffff; text-align: left; padding: 5px; }
-</style> 
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+
+<link href="jquery-ui-1.10.4.custom/css/cupertino/jquery-ui-1.10.4.custom.css" rel="stylesheet">
+<script src="jquery-ui-1.10.4.custom/js/jquery-1.10.2.js"></script>
+<script src="jquery-ui-1.10.4.custom/js/jquery-ui-1.10.4.custom.js"></script>
+
 <script type="text/javascript" src="js/three.min.js"></script> 
 <script type="text/javascript" src="js/OrbitControls.js"></script> 
 <script type="text/javascript" src="js/Detector.js"></script> 
 <script type="text/javascript" src="js/CollisionUtils.js"></script>
 <script type="text/javascript" src="js/Collisions.js"></script>
 <script type="text/javascript" src="js/libs/stats.min.js"></script>
+
+<style type="text/css">
+	body { 
+		margin: 0px; 
+		padding: 0px;
+		font-size: 12px;
+	}
+	canvas { 
+		width: 100%; 
+		height: 100%
+	}
+	.placar { 
+		position: absolute; 
+		width: 80px; 
+		height: 20px; 
+		top: 0px; 
+		background-color: #ffffff; 
+		text-align: center;
+	}
+	.msg {
+		position: absolute; 
+		width: 400px; 
+		height: 20px; 
+		bottom: 0px; 
+		background-color: #ffffff; 
+		text-align: left; 
+		overflow: hidden 
+	}
+	.timer { 
+		position: absolute; 
+		width: 80px; 
+		height: 20px; 
+		top: 0px; 
+		left: 50%; 
+		margin-left: -40px; 
+		background-color: #ffffff; 
+		text-align: center; 
+	}
+	.screen {
+		position: absolute; 
+		width: 600px; 
+		height: 500px; 
+		top: 50%; 
+		left: 50%; 
+		margin-left: -300px; 
+		margin-top: -250px; 
+		background-color: #ffffff; 
+		text-align: left; 
+		padding: 5px;
+	}
+	#accordion {
+		position: absolute; 
+		width: 600px; 
+		height: 400px;
+		top: 50%;
+		left: 50%; 
+		margin-left: -300px; 
+		margin-top: -200px; 
+	}
+</style>
 <script type="text/javascript">
 var game;
-window.onload = function(){
+$( document ).ready(function() {
 	game = new Game();
 	game.init();
 
-	var screen = document.createElement('div');
+	$("#accordion").accordion({heightStyle: "content"});
+	$("button")
+		.button()
+		.click(function( event ) {
+			game.start();
+			$( "#accordion" ).hide();
+		});
+
+	var bonus_html = "Tipos:<br>";
+	for(i in BonusDescription){
+		bonus_html += i + " - " + BonusDescription[i] + '<br>';
+	}
+	$("#accordion_bonus").html(bonus_html);
+
+	/*var screen = document.createElement('div');
 	screen.id = "screen";
 	screen.className = "screen";
 	screen.innerHTML = 
@@ -45,9 +116,8 @@ window.onload = function(){
 	document.getElementById('iniciar').onclick = function(){
 		game.start();
 		document.getElementById('screen').style.display = 'none';
-	}
-
-}
+	}*/
+});
 
 function Game() {
 	this.speed = 5;
@@ -178,6 +248,8 @@ function Game() {
 				obj.addSphere();
 			});
 		})(this);
+
+		this.renderer.render(this.scene, this.camera);
 	};
 
 	this.start = function() {
@@ -317,7 +389,7 @@ function Game() {
 			}
 
 			// colisao
-			var ray = new THREE.Ray( this.spheres[i].position, new THREE.Vector3( 0, 0, 1 ) );
+			var ray = new THREE.Ray( this.spheres[i].position, new THREE.Vector3( -1, 0, -1 ).normalize() );
 			var c = THREE.Collisions.rayCastNearest( ray );
 
 			//var color = "0x"+((1<<24)*Math.random()|0).toString(16);
@@ -462,6 +534,21 @@ function Player() {
 			this.div_msg.style.right = this.cube.position.x-230;
 		}
 		document.body.appendChild(this.div_msg);
+
+		/*var type = 'highlight';
+		if (type === 'highlight') {
+		    icon = 'ui-icon-info';
+		} else {
+		    icon = 'ui-icon-alert';
+		}
+		var alertHtml = '<div class="ui-state-' + type + ' ui-corner-all" style="padding:0 .7em;">';
+		alertHtml += '<p>';
+		alertHtml += '<span class="ui-icon ' + icon + '" style="float:left;margin-right: .3em;"></span>';
+		this.div_msg = $('<div></div>');
+		alertHtml += this.div_msg;
+		alertHtml += '</p>';
+		alertHtml += '</div>';
+		$("body").append(alertHtml);*/
 	};
 }
 
@@ -614,5 +701,28 @@ function Timer(){
 </head> 
 <body>
 	<div id="container"></div>
+
+	<div id="accordion">
+		<h3>Instruções</h3>
+		<div>
+			<b>Player 1:</b><br>
+			Tecla 'w'/'s' para movimentar<br>
+			Tecla 'a' para usar os bonus<br>
+			<b>Player 2:</b><br>
+			Tecla 'i'/'k' para movimentar<br>
+			Tecla 'j' para usar os bonus<br>
+			<br>
+			Mouse para mover tela
+		</div>
+		<h3>Regras</h3>
+		<div>
+			-Cria bonus para os players a cada 30 sec<br>
+			-Gera um bonus para um player a cada 3 pontos ganhos<br>
+		</div>
+		<h3>Lista dos bonus</h3>
+		<div id="accordion_bonus"></div>
+		<h3>Iniciar o jogo</h3>
+		<div><button>Iniciar</button></div>
+	</div>
 </body> 
 </html>
