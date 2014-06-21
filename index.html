@@ -1,0 +1,728 @@
+<html> 
+<head> 
+<title>Pong Game WebGL- Computação gráfica</title> 
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+
+<link href="jquery-ui-1.10.4.custom/css/cupertino/jquery-ui-1.10.4.custom.css" rel="stylesheet">
+<script src="jquery-ui-1.10.4.custom/js/jquery-1.10.2.js"></script>
+<script src="jquery-ui-1.10.4.custom/js/jquery-ui-1.10.4.custom.js"></script>
+
+<script type="text/javascript" src="js/three.min.js"></script> 
+<script type="text/javascript" src="js/OrbitControls.js"></script> 
+<script type="text/javascript" src="js/Detector.js"></script> 
+<script type="text/javascript" src="js/CollisionUtils.js"></script>
+<script type="text/javascript" src="js/Collisions.js"></script>
+<script type="text/javascript" src="js/libs/stats.min.js"></script>
+
+<style type="text/css">
+	body { 
+		margin: 0px; 
+		padding: 0px;
+		font-size: 12px;
+	}
+	canvas { 
+		width: 100%; 
+		height: 100%
+	}
+	.placar { 
+		position: absolute; 
+		width: 80px; 
+		height: 20px; 
+		top: 0px; 
+		background-color: #ffffff; 
+		text-align: center;
+	}
+	.msg {
+		position: absolute; 
+		width: 400px; 
+		height: 20px; 
+		bottom: 0px; 
+		background-color: #ffffff; 
+		text-align: left; 
+		overflow: hidden 
+	}
+	.timer { 
+		position: absolute; 
+		width: 80px; 
+		height: 20px; 
+		top: 0px; 
+		left: 50%; 
+		margin-left: -40px; 
+		background-color: #ffffff; 
+		text-align: center; 
+	}
+	.screen {
+		position: absolute; 
+		width: 600px; 
+		height: 500px; 
+		top: 50%; 
+		left: 50%; 
+		margin-left: -300px; 
+		margin-top: -250px; 
+		background-color: #ffffff; 
+		text-align: left; 
+		padding: 5px;
+	}
+	#accordion {
+		position: absolute; 
+		width: 600px; 
+		height: 350px;
+		top: 50px;
+		left: 50%; 
+		margin-left: -300px;
+	}
+</style>
+<script type="text/javascript">
+var game;
+$( document ).ready(function() {
+	game = new Game();
+	game.init();
+
+	$("#accordion").accordion({collapsible: true, heightStyle: "content"});
+	$("button")
+		.button()
+		.click(function( event ) {
+			game.start();
+			$("#accordion").hide();
+		});
+
+	var bonus_html = "Tipos:<br>";
+	for(i in BonusDescription){
+		bonus_html += i + " - " + BonusDescription[i] + '<br>';
+	}
+	$("#accordion_bonus").html(bonus_html);
+
+	/*var screen = document.createElement('div');
+	screen.id = "screen";
+	screen.className = "screen";
+	screen.innerHTML = 
+		"<b>Instruções:</b><br>" +
+		"Player 1:<br>" +
+		"Tecla 'w'/'s' para movimentar<br>" +
+		"Tecla 'a' para usar os bonus<br>" +
+		"Player 2:<br>" +
+		"Tecla 'i'/'k' para movimentar<br>" +
+		"Tecla 'j' para usar os bonus<br>" +
+		"<br><b>Bonus:</b><br>" + 
+		"-Adiciona bonus a cada 30 sec<br>" + 
+		"-Bonus a cada 3 pontos<br>" +
+		"Tipos:<br>";
+	for(i in BonusDescription){
+		screen.innerHTML += i + " - " + BonusDescription[i] + '<br>';
+	}
+	screen.innerHTML += "<input type='button' value='Iniciar' id='iniciar'>";
+	document.body.appendChild(screen);
+	document.getElementById('iniciar').onclick = function(){
+		game.start();
+		document.getElementById('screen').style.display = 'none';
+	}*/
+});
+
+function Game() {
+	this.speed = 5;
+	this.limit_x = 280;
+	this.limit_z = 200;
+	this.width = window.innerWidth;
+	this.height = window.innerHeight;
+	this.scene = new THREE.Scene();
+	this.camera = new THREE.PerspectiveCamera(30, this.width / this.height, 0.1, 20000);
+	this.renderer;
+	this.webgl_available = Detector.webgl;
+	this.controls;
+	this.stats;
+	this.key = [];
+	this.spheres = [];
+	this.direction_x = []; //0 left, 1 right
+	this.direction_z = []; //0 top, 1 down
+	this.direction_y = []; //-1 none, 0 top, 1 down
+	this.p1 = new Player();
+	this.p2 = new Player();
+	this.timer = new Timer();
+
+	this.init = function() {
+		var container = document.getElementById('container');
+		// render
+		if ( this.webgl_available ){
+			this.renderer = new THREE.WebGLRenderer( {antialias:true} );
+		}else{
+			this.renderer = new THREE.CanvasRenderer(); 
+		}
+		this.renderer.setSize(this.width, this.height);
+		container.appendChild(this.renderer.domElement);
+
+		// camera
+		this.camera.position.set(0,500,700);
+		if(!this.webgl_available){
+			this.camera.position.set(0,800,0);
+		}
+		this.scene.add(this.camera);
+		this.camera.lookAt(this.scene.position);
+
+		// controls
+		this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+		this.controls.noKeys = true;
+
+		// light
+		var ambientLight = new THREE.AmbientLight(0x222222);
+		this.scene.add(ambientLight);
+		var directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+		directionalLight.position.set(0, 10, 3).normalize();
+		this.scene.add(directionalLight);
+
+		// floor
+		var floorMaterial = new THREE.MeshLambertMaterial( { color: 0x444444, side: THREE.DoubleSide } );
+		var floorGeometry = new THREE.PlaneGeometry(this.limit_x*2, this.limit_z*2, 1, 1);
+		var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+		floor.position.y = -8;
+		floor.rotation.x = Math.PI / 2;
+		this.scene.add(floor);
+		/*var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard.jpg' );
+		floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+		floorTexture.repeat.set( 10, 10 );
+		var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+		var floorGeometry = new THREE.PlaneGeometry(this.limit_x*2, this.limit_z*2, 1, 1);
+		var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+		floor.position.y = -8;
+		floor.rotation.x = Math.PI / 2;
+		this.scene.add(floor);*/
+		//laterais
+		var material = new THREE.MeshLambertMaterial( { color: 0x444444, side: THREE.DoubleSide } );
+		var geometry = new THREE.PlaneGeometry(this.limit_x*2, 16, 1, 1);
+		var side1 = new THREE.Mesh(geometry, material);
+		side1.position.z = -this.limit_z;
+		side1.rotation.x = Math.PI;
+		this.scene.add(side1);
+		var material = new THREE.MeshLambertMaterial( { color: 0x444444, side: THREE.DoubleSide } );
+		var geometry = new THREE.PlaneGeometry(this.limit_x*2, 16, 1, 1);
+		var side2 = new THREE.Mesh(geometry, material);
+		side2.position.z = this.limit_z;
+		side2.rotation.x = Math.PI;
+		this.scene.add(side2);
+
+		// sky
+		var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
+		var skyBoxMaterial = new THREE.MeshBasicMaterial( { color: 0xaaccff, side: THREE.BackSide } );
+		var skyBox = new THREE.Mesh(skyBoxGeometry, skyBoxMaterial);
+		this.scene.add(skyBox);
+
+		// stats - fps
+		this.stats = new Stats();
+		this.stats.domElement.style.position = 'absolute';
+		this.stats.domElement.style.top = '0px';
+		container.appendChild(this.stats.domElement);
+
+		// cubes
+		this.p1.makeCube(-230, this.scene);
+		this.p2.makeCube(230, this.scene);
+		this.p1.setOpponent(this.p2);
+		this.p2.setOpponent(this.p1);
+
+		// events
+		(function(obj){
+			document.body.onkeydown = document.body.onkeyup = function(e){
+				var e = e || event;
+				var keyCode = (e.keyCode ? e.keyCode : e.which);
+				obj.key[keyCode] = e.type == 'keydown';
+			};
+		})(this);
+		(function(obj){
+			document.body.onkeypress = function(e){
+				var keyCode = (e.keyCode ? e.keyCode : e.which);
+				if(keyCode == 97){ //a - usa bonus
+					var b = obj.p1.getNextBonus();
+					if(b){
+						b.start();
+					}
+				}
+				if(keyCode == 106){ //j - usa bonus
+					var b = obj.p2.getNextBonus();
+					if(b){
+						b.start();
+					}
+				}
+			};
+		})(this);
+		(function(obj){
+			obj.renderer.domElement.addEventListener('mouseup', function(event){
+				obj.addSphere();
+			});
+		})(this);
+
+		this.renderer.render(this.scene, this.camera);
+	};
+
+	this.start = function() {
+		this.p1.makePlacar();
+		this.p2.makePlacar();
+		this.p1.makeMsg();
+		this.p2.makeMsg();
+
+		// sphere
+		this.addSphere();
+
+		// timer
+		this.timer = new Timer();
+		this.timer.init();
+
+		this.animate();
+	};
+
+	this.addSphere = function() {
+		var rad = 7;
+		var sposition = new THREE.Vector3(0, 0, 0);
+		var geometry = new THREE.SphereGeometry(rad, 30, 30);
+		var material = new THREE.MeshLambertMaterial({color: 0xD7EBF9});
+		if(!this.webgl_available){
+			material = new THREE.MeshBasicMaterial({color: 0xD7EBF9});
+		}
+		var sphere = new THREE.Mesh(geometry, material); 
+		sphere.position = sposition;
+		this.scene.add(sphere);
+		var sc = new THREE.SphereCollider(sposition, rad);
+		sc.mesh = sphere;
+		THREE.Collisions.colliders.push(sc);
+		var len = this.spheres.push(sphere) - 1;
+		this.direction_x[len] = Math.round(Math.random());
+		this.direction_z[len] = Math.round(Math.random());
+		this.direction_y[len] = 0;
+	};
+
+	this.animate = function() {
+		if(this.spheres.length > 0){
+			(function(obj){
+				requestAnimationFrame(function(){
+					obj.animate();
+				});
+			})(this);
+			this.update();
+			this.controls.update();
+			this.stats.update();
+			this.renderer.render(this.scene, this.camera);
+		}else{
+			this.timer.stop();
+			if(this.p1.points > this.p2.points){
+				this.p1.div_msg.innerHTML = "Você ganhou!";
+				this.p2.div_msg.innerHTML = "Você perdeu!";
+			}else if(this.p1.points < this.p2.points){
+				this.p1.div_msg.innerHTML = "Você perdeu!";
+				this.p2.div_msg.innerHTML = "Você ganhou!";
+			}else{
+				this.p1.div_msg.innerHTML = "Ninguém ganhou!";
+				this.p2.div_msg.innerHTML = "Ninguém ganhou!";
+			}
+
+			$("#accordion").show();
+		}
+	};
+
+	this.update = function() {
+		// events keys
+		// player 1
+		if(this.key[87]){ //w cima
+			if(this.p1.cube.position.z-(this.p1.cube.scale.z*this.p1.cube_width_z/2) > -this.limit_z){
+				this.p1.cube.position.z -= this.p1.speed_cube;
+			}
+		}else if(this.key[83]){ //s baixo
+			if(this.p1.cube.position.z+(this.p1.cube.scale.z*this.p1.cube_width_z/2) < this.limit_z){
+				this.p1.cube.position.z += this.p1.speed_cube;
+			}
+		}
+		// player 2
+		if(this.key[73]){ //i cima
+			if(this.p2.cube.position.z-(this.p2.cube.scale.z*this.p2.cube_width_z/2) > -this.limit_z){
+				this.p2.cube.position.z -= this.p2.speed_cube;
+			}
+		}else if(this.key[75]){ //k baixo
+			if(this.p2.cube.position.z+(this.p2.cube.scale.z*this.p2.cube_width_z/2) < this.limit_z){
+				this.p2.cube.position.z += this.p2.speed_cube;
+			}
+		}
+		//if(this.key[81]){ //q
+		//	this.p2.cube.rotation.y += .1;
+		//}
+		//if(this.key[69]){ //e
+		//	this.p2.cube.rotation.y -= .1;
+		//}
+
+		// sphere move
+		var i, s;
+		for(i in this.spheres){
+			if(this.direction_x[i] == 1){
+				this.spheres[i].position.x += this.speed;
+			}else if(this.direction_x[i] == 0){
+				this.spheres[i].position.x -= this.speed;
+			}else if(this.direction_y[i] == 1){
+				this.spheres[i].position.y -= this.speed*3;
+			}
+			if(this.direction_z[i] == 1){
+				this.spheres[i].position.z += this.speed;
+			}else if(this.direction_z[i] == 0){
+				this.spheres[i].position.z -= this.speed;
+			}
+
+			// borda direita
+			if(this.spheres[i].position.x >= this.limit_x && this.direction_y[i] == 0){
+				this.direction_y[i] = 1;
+				this.direction_x[i] = -1;
+				this.direction_z[i] = -1;
+				this.p1.makePoint();
+			// borda esquerda
+			}else if(this.spheres[i].position.x <= -this.limit_x && this.direction_y[i] == 0){
+				this.direction_y[i] = 1;
+				this.direction_x[i] = -1;
+				this.direction_z[i] = -1;
+				this.p2.makePoint();
+			}
+			// bordas superior e inferior
+			if(this.spheres[i].position.z >= this.limit_z-10 || this.spheres[i].position.z <= -this.limit_z+10){
+				this.direction_z[i] = this.direction_z[i] != 1?1:0;
+			}
+			// cair
+			if(this.direction_y[i] == 1 && this.spheres[i].position.y < -2000){
+				s = this.spheres[i];
+				this.spheres.splice(i, 1);
+				this.direction_x.splice(i, 1);
+				this.direction_y.splice(i, 1);
+				this.direction_z.splice(i, 1);
+				//delete this.spheres[i];
+				this.scene.remove(s);
+			}
+
+			// colisao
+			var ray = new THREE.Ray( this.spheres[i].position, new THREE.Vector3( -1, 0, -1 ).normalize() );
+			var c = THREE.Collisions.rayCastNearest( ray );
+
+			//var color = "0x"+((1<<24)*Math.random()|0).toString(16);
+			if(c != null && c.distance == -1){
+				this.direction_x[i] = this.direction_x[i] != 1?1:0;
+				//c.mesh.material.color.setHex(color);
+			}
+		}
+
+		/*var vector = new THREE.Vector3( 0, 0, 0 );
+		var ray = new THREE.Ray( cube.position, vector.sub( cube.position ).normalize() );
+		var cs = THREE.Collisions.rayCastAll( ray );
+		//console.log(cs);
+		if ( cs.length > 0 ) {
+			console.log(cs.length + " colisao ");
+			for ( var i = 0; i < cs.length; i ++ ) {
+				console.log(cs[i].mesh);
+				//console.log(cs[i].mesh.id);
+				cs[ i ].mesh.material.color.setHex( 0xff0000 );
+			}
+		} else {
+			console.log("sem colisao");
+		}*/
+
+	}
+}
+
+function Player() {
+	this.cube;
+	this.cube_width_z = 100;
+	this.speed_cube = 5;
+	this.points = 0;
+	this.div_placar;
+	this.bonus_list = [];
+	this.opponent;
+	this.div_msg;
+
+	this.makeCube = function(position_x, scene) {
+		var cposition = new THREE.Vector3(position_x, 3, 0);
+		var geometry = new THREE.CubeGeometry(10,20,this.cube_width_z);
+		var material = new THREE.MeshLambertMaterial({color: 0x2181CA, opacity: 0.5});
+		if(!game.webgl_available){
+			material = new THREE.MeshBasicMaterial({color: 0x2181CA});
+		}
+		this.cube = new THREE.Mesh(geometry, material);
+		this.cube.position = cposition;
+		scene.add(this.cube);
+		THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(this.cube));
+
+	};
+
+	this.setOpponent = function(o) {
+		this.opponent = o;
+	};
+
+	this.getOpponent = function(){
+		return this.opponent;
+	};
+
+	this.makePlacar = function(){
+		this.div_placar = document.createElement('div');
+		this.div_placar.className = "placar";
+		if(this.cube.position.x < 0){
+			this.div_placar.style.left = -this.cube.position.x-50;
+		}else{
+			this.div_placar.style.right = this.cube.position.x-50;
+		}
+		this.div_placar.innerHTML = this.points;
+		document.body.appendChild(this.div_placar);
+	};
+
+	this.makePoint = function(){
+		this.points++;
+
+		// gera bonus a cada 3 pontos
+		if(this.points % 3 == 0){
+			this.createBonus();
+		}
+
+		this.div_placar.innerHTML = this.points;
+	};
+
+	this.createBonus = function(){
+		var b = new Bonus(this);
+
+		//adiciona cubo na tela
+		var x = document.createElement("canvas");
+		var xc = x.getContext("2d");
+		x.width = x.height = 90;
+		//xc.shadowColor = "#ffffff";
+		//xc.shadowBlur = 7;
+		xc.font = "bold 70px arial";
+		xc.textAlign = "center";
+		xc.fillStyle = "#000000";
+		xc.fillText(b.type, 40, 70);
+
+		var darkMaterial = new THREE.MeshLambertMaterial( { map: new THREE.Texture(x), transparent: true } );
+		darkMaterial.map.needsUpdate = true;
+		var wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000088, wireframe: true, transparent: true } ); 
+		var geometry = new THREE.CubeGeometry(20, 20, 20);
+		var shape = THREE.SceneUtils.createMultiMaterialObject( geometry, [ darkMaterial, wireframeMaterial ] );
+		shape.position.set(this.cube.position.x*1.3, ((this.bonus_list.length)*21)+3, -game.limit_z-10);
+		shape.doubleSided = true;
+		game.scene.add(shape);
+
+		/*var cposition = new THREE.Vector3(this.cube.position.x, ((this.bonus_list.length-1)*21)+2, -game.limit_z-10);
+                var geometry = new THREE.CubeGeometry(20,20,20);
+                //var material = new THREE.MeshLambertMaterial({map: new THREE.Texture(x), color: 0x000000, wireframe: true});
+                var material = new THREE.MeshLambertMaterial({map: new THREE.Texture(x)});
+		material.map.needsUpdate = true;
+                if(!game.webgl_available){
+                        material = new THREE.MeshBasicMaterial({map: new THREE.Texture(x)});
+			material.map.needsUpdate = true;
+                }
+                var cube = new THREE.Mesh(geometry, material);
+		cube.doubleSided = true;
+                cube.position = cposition;
+                game.scene.add(cube);*/
+
+		this.bonus_list.push({bonus: b, scene_cube: shape});
+	};
+
+	this.getNextBonus = function(){
+		if(this.bonus_list.length > 0){
+			var node = this.bonus_list.shift();
+			game.scene.remove(node.scene_cube);
+
+			this.div_msg.innerHTML = BonusDescription[node.bonus.type];
+
+			return node.bonus;
+		}else{
+			this.div_msg.innerHTML = "Sem bonus para utilizar";
+		}
+	};
+
+	this.makeMsg = function() {
+		this.div_msg = document.createElement('div');
+		this.div_msg.className = "msg";
+		if(this.cube.position.x < 0){
+			this.div_msg.style.left = -this.cube.position.x-230;
+		}else{
+			this.div_msg.style.right = this.cube.position.x-230;
+		}
+		document.body.appendChild(this.div_msg);
+
+		/*var type = 'highlight';
+		if (type === 'highlight') {
+		    icon = 'ui-icon-info';
+		} else {
+		    icon = 'ui-icon-alert';
+		}
+		var alertHtml = '<div class="ui-state-' + type + ' ui-corner-all" style="padding:0 .7em;">';
+		alertHtml += '<p>';
+		alertHtml += '<span class="ui-icon ' + icon + '" style="float:left;margin-right: .3em;"></span>';
+		this.div_msg = $('<div></div>');
+		alertHtml += this.div_msg;
+		alertHtml += '</p>';
+		alertHtml += '</div>';
+		$("body").append(alertHtml);*/
+	};
+}
+
+function Bonus(player){
+	this.player = player;
+	this.type = Math.floor(Math.random() * 11);
+
+	this.start = function(){
+		eval("this.b" + this.type)();
+	};
+
+	this.b0 = function(){
+		var speed_current = game.speed;
+		game.speed = game.speed * 1/2;
+
+		setTimeout(function(){
+			game.speed = speed_current;
+		}, 15000);
+	};
+	this.b1 = function(){
+		game.addSphere();
+	};
+	this.b2 = function(){
+		var size_current = player.cube.scale.z;
+		player.cube.scale.z = player.cube.scale.z * 2;
+
+		setTimeout(function(){
+			player.cube.scale.z = size_current;
+		}, 10000);
+	};
+	this.b3 = function(){
+		var size_current = player.opponent.cube.scale.z;
+                player.opponent.cube.scale.z = player.opponent.cube.scale.z / 2;
+
+                setTimeout(function(){
+                        player.opponent.cube.scale.z = size_current;
+                }, 10000);
+	};
+	this.b4 = function(){
+		game.addSphere();
+		game.addSphere();
+	};
+	this.b5 = function(){
+		var speed_current = game.speed;
+		game.speed = game.speed * 2;
+
+		setTimeout(function(){
+			game.speed = speed_current;
+		}, 15000);
+	};
+	this.b6 = function(){
+		var speed_current = player.opponent.speed_cube;
+                player.opponent.speed_cube = 0;
+
+                setTimeout(function(){
+                        player.opponent.speed_cube = speed_current;
+                }, 5000);
+	};
+	this.b7 = function(){
+		var speed_current = player.speed_cube;
+		player.speed_cube = player.speed_cube * 2;
+
+		setTimeout(function(){
+			player.speed_cube = speed_current;
+		}, 15000);
+	};
+	this.b8 = function(){
+		game.addSphere();
+		game.addSphere();
+		game.addSphere();
+	};
+	this.b9 = function(){
+		for(i in game.direction_x){
+			if(game.direction_x[i] == 0){
+				game.direction_x[i] = 1;
+			}else if(game.direction_x[i] == 1){
+				game.direction_x[i] = 0;
+			}
+		}
+	};
+	this.b10 = function(){
+		this.start();
+		this.start();
+	};
+}
+
+var BonusDescription = [
+	"Diminui velocidade das bolinhas por 15 seg",
+	"Cria uma bolinha",
+	"Aumenta tamanho do cubo por 10 seg",
+	"Reduz tamanho do cubo do adversario por 10 seg",
+	"Cria 2 bolinhas",
+	"Aumenta velocidade das bolinhas por 15 seg",
+	"Trava cubo do adversario por 5 seg",
+	"Aumenta velocidade do cubo por 15 seg",
+	"Cria 3 bolinhas",
+	"Muda direcao das bolinhas",
+	"Ganha 2 bonus aleatórios"
+];
+
+function Timer(){
+	this.totalSeconds = 0;
+	this.timer;
+	this.label;
+
+	this.init = function(){
+		this.label = document.createElement('div');
+		this.label.className = "timer";
+		document.body.appendChild(this.label);
+
+		this.start();
+	};
+
+	this.start = function() {
+		(function(obj){
+			obj.timer = setInterval(function(){
+				obj.setTimeUpdate();
+			}, 1000);
+		})(this);
+	};
+
+	this.stop = function() {
+		clearInterval(this.timer);
+	};
+
+	this.setTimeUpdate = function() {
+		++this.totalSeconds;
+		var m = this.padstr(parseInt(this.totalSeconds / 60));
+		var s = this.padstr(this.totalSeconds % 60);
+		this.label.innerHTML = m + ":" + s;
+
+		// gera bonus a cada 30 seg
+		if(s == 0 || s == 30){
+			game.p1.createBonus();
+			game.p2.createBonus();
+		}
+	};
+
+	this.padstr = function(val) {
+		var valString = val + "";
+		if(valString.length < 2) {
+			return "0" + valString;
+		} else {
+			return valString;
+		}
+	};
+}
+
+</script> 
+</head> 
+<body>
+	<div id="container"></div>
+
+	<div id="accordion">
+		<h3>Instruções</h3>
+		<div>
+			<b>Player 1:</b><br>
+			Tecla 'w'/'s' para movimentar<br>
+			Tecla 'a' para usar os bonus<br>
+			<b>Player 2:</b><br>
+			Tecla 'i'/'k' para movimentar<br>
+			Tecla 'j' para usar os bonus<br>
+			<br>
+			Mouse para mover tela
+		</div>
+		<h3>Regras</h3>
+		<div>
+			-Cria bonus para os players a cada 30 sec<br>
+			-Gera um bonus para um player a cada 3 pontos ganhos<br>
+		</div>
+		<h3>Lista dos bonus</h3>
+		<div id="accordion_bonus"></div>
+		<h3>Iniciar o jogo</h3>
+		<div><button>Iniciar</button></div>
+	</div>
+</body> 
+</html>
