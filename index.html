@@ -1,5 +1,5 @@
-<html> 
-<head> 
+<html>
+<head>
 <title>Pong Game WebGL- Computação gráfica</title> 
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
 
@@ -7,10 +7,7 @@
 <script src="jquery-ui-1.10.4.custom/js/jquery-1.10.2.js"></script>
 <script src="jquery-ui-1.10.4.custom/js/jquery-ui-1.10.4.custom.js"></script>
 
-<!--<script type="text/javascript" src="js/three.min.js"></script> -->
 <script type="text/javascript" src="three.js-master/build/three.js"></script>
-<script type="text/javascript" src="js/CollisionUtils.js"></script>
-<script type="text/javascript" src="js/Collisions.js"></script>
 <script type="text/javascript" src="js/OrbitControls.js"></script> 
 <script type="text/javascript" src="js/Detector.js"></script> 
 <script type="text/javascript" src="js/libs/stats.min.js"></script>
@@ -71,6 +68,7 @@
 		top: 50px;
 		left: 50%; 
 		margin-left: -300px;
+		display: none;
 	}
 </style>
 <script type="text/javascript">
@@ -92,6 +90,8 @@ $(document).ready(function() {
 		bonus_html += i + " - " + BonusDescription[i] + '<br>';
 	}
 	$("#accordion_bonus").html(bonus_html);
+
+	$("#accordion").show();
 });
 
 function Game() {
@@ -114,6 +114,7 @@ function Game() {
 	this.p1 = new Player();
 	this.p2 = new Player();
 	this.timer = new Timer();
+	this.obstacles = [];
 
 	this.init = function() {
 		var container = $('#container');
@@ -261,9 +262,8 @@ function Game() {
 		var sphere = new THREE.Mesh(geometry, material); 
 		sphere.position = sposition;
 		this.scene.add(sphere);
-		//var sc = new THREE.SphereCollider(sposition, rad);
-		//sc.mesh = sphere;
-		//THREE.Collisions.colliders.push(sc);
+		//this.obstacles.push(sphere);
+
 		var len = this.spheres.push(sphere) - 1;
 		this.direction_x[len] = Math.round(Math.random());
 		this.direction_z[len] = Math.round(Math.random());
@@ -329,6 +329,20 @@ function Game() {
 		//	this.p2.cube.rotation.y -= .1;
 		//}
 
+		var rays = [
+			new THREE.Vector3(0, 0, 1), //down
+			new THREE.Vector3(1, 0, 1), //right down
+			new THREE.Vector3(1, 0, 0), //right
+			new THREE.Vector3(1, 0, -1), //right up
+			new THREE.Vector3(0, 0, -1), //up
+			new THREE.Vector3(-1, 0, -1), //left up
+			new THREE.Vector3(-1, 0, 0), //left
+			new THREE.Vector3(-1, 0, 1) //left down
+		];
+		var caster = new THREE.Raycaster();
+		var collisions;
+		var distance = 5;
+
 		// sphere move
 		var i, s;
 		for(i in this.spheres){
@@ -375,59 +389,29 @@ function Game() {
 
 			if(this.spheres[i] != undefined){
 				// colisao
-				var ray = new THREE.Ray( this.spheres[i].position, new THREE.Vector3( -1, 0, -1 ).normalize() );
-				var c = THREE.Collisions.rayCastNearest( ray );
+				for (var j = 0; j < rays.length; j++) {
+					caster.set(this.spheres[i].position, rays[j]);
+					collisions = caster.intersectObjects(this.obstacles);
+					if (collisions.length > 0 && collisions[0].distance <= distance) {
+						if (j == 0 || j == 4) { //cubo up ou down
+							this.direction_z[i] = this.direction_z[i] != 1?1:0;
+						}
+						if (j != 0 && j != 4) {
+							this.direction_x[i] = this.direction_x[i] != 1?1:0;
+						}
+					}
+				}
+				//var ray = new THREE.Ray( this.spheres[i].position, new THREE.Vector3( -1, 0, -1 ).normalize() );
+				//var c = THREE.Collisions.rayCastNearest( ray );
 
-				if(c != null && c.distance == -1){
-					this.direction_x[i] = this.direction_x[i] != 1?1:0;
+				//if(c != null && c.distance == -1){
+				//	this.direction_x[i] = this.direction_x[i] != 1?1:0;
 					//var color = "0x"+((1<<24)*Math.random()|0).toString(16);
 					//c.mesh.material.color.setHex(color);
-				}
+				//}
 			}
 		}
 
-	/*
-	var collisions, i,
-            // Maximum distance from the origin before we consider collision
-            distance = 32,
-            // Get the obstacles array from our world
-            obstacles = basicScene.world.getObstacles();
-        // For each ray
-        for (i = 0; i < this.rays.length; i += 1) {
-            // We reset the raycaster to this direction
-            this.caster.set(this.mesh.position, this.rays[i]);
-            // Test if we intersect with any obstacle mesh
-            collisions = this.caster.intersectObjects(obstacles);
-            // And disable that direction if we do
-            if (collisions.length > 0 && collisions[0].distance <= distance) {
-                // Yep, this.rays[i] gives us : 0 => up, 1 => up-left, 2 => left, ...
-                if ((i === 0 || i === 1 || i === 7) && this.direction.z === 1) { this.direction.setZ(0); } else if ((i === 3 || i === 4 || i === 5) && this.direction.z === -1) { this.direction.setZ(0); }
-                if ((i === 1 || i === 2 || i === 3) && this.direction.x === 1) { this.direction.setX(0); } else if ((i === 5 || i === 6 || i === 7) && this.direction.x === -1) { this.direction.setX(0); }
-            }
-        }		
-
-	// collision detection:
-	//   determines if any of the rays from the cube's origin to each vertex
-	//		intersects any face of a mesh in the array of target meshes
-	//   for increased collision accuracy, add more vertices to the cube;
-	//		for example, new THREE.CubeGeometry( 64, 64, 64, 8, 8, 8, wireMaterial )
-	//   HOWEVER: when the origin of the ray is within the target mesh, collisions do not occur
-	var originPoint = MovingCube.position.clone();
-
-	clearText();
-	
-	for (var vertexIndex = 0; vertexIndex < MovingCube.geometry.vertices.length; vertexIndex++)
-	{		
-		var localVertex = MovingCube.geometry.vertices[vertexIndex].clone();
-		var globalVertex = localVertex.applyMatrix4( MovingCube.matrix );
-		var directionVector = globalVertex.sub( MovingCube.position );
-		
-		var ray = new THREE.Raycaster( originPoint, directionVector.clone().normalize() );
-		var collisionResults = ray.intersectObjects( collidableMeshList );
-		if ( collisionResults.length > 0 && collisionResults[0].distance < directionVector.length() ) 
-			appendText(" Hit ");
-	}
-	*/
 	}
 }
 
@@ -442,7 +426,7 @@ function Player() {
 	this.label_msg;
 
 	this.makeCube = function(position_x, scene) {
-		//var cposition = new THREE.Vector3(position_x+(position_x > 0?-200:200), 3, 50);
+		//var cposition = new THREE.Vector3(position_x+(position_x > 0?-204:204), 3, 80);
 		var cposition = new THREE.Vector3(position_x, 3, 0);
 		var geometry = new THREE.CubeGeometry(10,20,this.cube_width_z);
 		var material = new THREE.MeshLambertMaterial({color: 0x2779aa, opacity: 0.5});
@@ -452,7 +436,7 @@ function Player() {
 		this.cube = new THREE.Mesh(geometry, material);
 		this.cube.position = cposition;
 		scene.add(this.cube);
-		THREE.Collisions.colliders.push(THREE.CollisionUtils.MeshOBB(this.cube));
+		game.obstacles.push(this.cube);
 	};
 
 	this.setOpponent = function(o) {
@@ -581,6 +565,7 @@ function Player() {
 		this.bonus_list = [];
 
 		this.cube.position.z = 0;
+		this.cube.scale.z = 1;
 	};
 }
 
