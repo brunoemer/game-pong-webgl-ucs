@@ -71,12 +71,14 @@
 		display: none;
 	}
 </style>
+
 <script type="text/javascript">
 var game;
 $(document).ready(function() {
 	game = new Game();
 	game.init();
 
+	//accordion
 	$("#accordion").accordion({collapsible: true, heightStyle: "content"});
 	$("#accordion_button")
 		.button()
@@ -92,6 +94,7 @@ $(document).ready(function() {
 	$("#accordion_bonus").html(bonus_html);
 
 	$("#accordion").show();
+
 });
 
 function Game() {
@@ -115,6 +118,7 @@ function Game() {
 	this.p2 = new Player();
 	this.timer = new Timer();
 	this.obstacles = [];
+	this.audio;
 
 	this.init = function() {
 		var container = $('#container');
@@ -193,6 +197,10 @@ function Game() {
 		this.p2.makeCube(230, this.scene);
 		this.p1.setOpponent(this.p2);
 		this.p2.setOpponent(this.p1);
+
+		//audio
+		this.audio = document.createElement('audio');
+		this.audio.setAttribute('src', 'audio/Metal_Cling_Hit.mp3');
 
 		// events
 		(function(obj){
@@ -395,20 +403,14 @@ function Game() {
 					if (collisions.length > 0 && collisions[0].distance <= distance) {
 						if (j == 0 || j == 4) { //cubo up ou down
 							this.direction_z[i] = this.direction_z[i] != 1?1:0;
+							this.audio.play();
 						}
 						if (j != 0 && j != 4) {
 							this.direction_x[i] = this.direction_x[i] != 1?1:0;
+							this.audio.play();
 						}
 					}
 				}
-				//var ray = new THREE.Ray( this.spheres[i].position, new THREE.Vector3( -1, 0, -1 ).normalize() );
-				//var c = THREE.Collisions.rayCastNearest( ray );
-
-				//if(c != null && c.distance == -1){
-				//	this.direction_x[i] = this.direction_x[i] != 1?1:0;
-					//var color = "0x"+((1<<24)*Math.random()|0).toString(16);
-					//c.mesh.material.color.setHex(color);
-				//}
 			}
 		}
 
