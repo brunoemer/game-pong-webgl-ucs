@@ -192,9 +192,9 @@ function Game() {
 		this.stats.domElement.style.top = '0px';
 		container.append(this.stats.domElement);
 
-		// cubes
-		this.p1.makeCube(-230, this.scene);
-		this.p2.makeCube(230, this.scene);
+		// paddles
+		this.p1.makePaddle(-230, this.scene);
+		this.p2.makePaddle(230, this.scene);
 		this.p1.setOpponent(this.p2);
 		this.p2.setOpponent(this.p1);
 
@@ -309,32 +309,36 @@ function Game() {
 	};
 
 	this.update = function() {
+
+//		console.log(this.p2.paddle.position.z-(this.p2.paddle.scale.z*this.p2.paddle_width_z/2) +'>'+ (-this.limit_z)); //cima
+//		console.log(this.p2.paddle.position.z+(this.p2.paddle.scale.z*this.p2.paddle_width_z/2) +'<'+ this.limit_z); //baixo
+
 		// events keys
 		// player 1
 		if(this.key[87]){ //w cima
-			if(this.p1.cube.position.z-(this.p1.cube.scale.z*this.p1.cube_width_z/2) > -this.limit_z){
-				this.p1.cube.position.z -= this.p1.speed_cube;
+			if(this.p1.paddle.position.z-(this.p1.paddle.scale.z*this.p1.paddle_width_z/2) > -this.limit_z){
+				this.p1.paddle.position.z -= this.p1.speed_paddle;
 			}
 		}else if(this.key[83]){ //s baixo
-			if(this.p1.cube.position.z+(this.p1.cube.scale.z*this.p1.cube_width_z/2) < this.limit_z){
-				this.p1.cube.position.z += this.p1.speed_cube;
+			if(this.p1.paddle.position.z+(this.p1.paddle.scale.z*this.p1.paddle_width_z/2) < this.limit_z){
+				this.p1.paddle.position.z += this.p1.speed_paddle;
 			}
 		}
 		// player 2
 		if(this.key[73]){ //i cima
-			if(this.p2.cube.position.z-(this.p2.cube.scale.z*this.p2.cube_width_z/2) > -this.limit_z){
-				this.p2.cube.position.z -= this.p2.speed_cube;
+			if(this.p2.paddle.position.z-(this.p2.paddle.scale.z*this.p2.paddle_width_z/2) > -this.limit_z){
+				this.p2.paddle.position.z -= this.p2.speed_paddle;
 			}
 		}else if(this.key[75]){ //k baixo
-			if(this.p2.cube.position.z+(this.p2.cube.scale.z*this.p2.cube_width_z/2) < this.limit_z){
-				this.p2.cube.position.z += this.p2.speed_cube;
+			if(this.p2.paddle.position.z+(this.p2.paddle.scale.z*this.p2.paddle_width_z/2) < this.limit_z){
+				this.p2.paddle.position.z += this.p2.speed_paddle;
 			}
 		}
 		//if(this.key[81]){ //q
-		//	this.p2.cube.rotation.y += .1;
+		//	this.p2.paddle.rotation.y += .1;
 		//}
 		//if(this.key[69]){ //e
-		//	this.p2.cube.rotation.y -= .1;
+		//	this.p2.paddle.rotation.y -= .1;
 		//}
 
 		var rays = [
@@ -401,11 +405,11 @@ function Game() {
 					caster.set(this.spheres[i].position, rays[j]);
 					collisions = caster.intersectObjects(this.obstacles);
 					if (collisions.length > 0 && collisions[0].distance <= distance) {
-						if (j == 0 || j == 4) { //cubo up ou down
+						if (j == 0 || j == 4) { //paddle up ou down
 							this.direction_z[i] = this.direction_z[i] != 1?1:0;
 							this.audio.play();
 						}
-						if (j != 0 && j != 4) {
+						if (j != 0 && j != 4) { // left ou right
 							this.direction_x[i] = this.direction_x[i] != 1?1:0;
 							this.audio.play();
 						}
@@ -414,31 +418,49 @@ function Game() {
 			}
 		}
 
+/*
+Computer.prototype.update = function(ball) {
+  var x_pos = ball.x;
+  var diff = -((this.paddle.x + (this.paddle.width / 2)) - x_pos);
+  if(diff < 0 && diff < -4) { // max speed left
+    diff = -5;
+  } else if(diff > 0 && diff > 4) { // max speed right
+    diff = 5;
+  }
+  this.paddle.move(diff, 0);
+  if(this.paddle.x < 0) {
+    this.paddle.x = 0;
+  } else if (this.paddle.x + this.paddle.width > 400) {
+    this.paddle.x = 400 - this.paddle.width;
+  }
+};
+*/
+
 	}
 }
 
 function Player() {
-	this.cube;
-	this.cube_width_z = 100;
-	this.speed_cube = 5;
+	this.paddle;
+	this.paddle_width_z = 100;
+	this.speed_paddle = 5;
 	this.points = 0;
 	this.label_placar;
 	this.bonus_list = [];
 	this.opponent;
 	this.label_msg;
 
-	this.makeCube = function(position_x, scene) {
+	this.makePaddle = function(position_x, scene) {
 		//var cposition = new THREE.Vector3(position_x+(position_x > 0?-204:204), 3, 80);
 		var cposition = new THREE.Vector3(position_x, 3, 0);
-		var geometry = new THREE.CubeGeometry(10,20,this.cube_width_z);
+		var geometry = new THREE.CubeGeometry(10,20,this.paddle_width_z);
 		var material = new THREE.MeshLambertMaterial({color: 0x2779aa, opacity: 0.5});
 		if(!game.webgl_available){
 			material = new THREE.MeshBasicMaterial({color: 0x2779aa});
 		}
-		this.cube = new THREE.Mesh(geometry, material);
-		this.cube.position = cposition;
-		scene.add(this.cube);
-		game.obstacles.push(this.cube);
+		this.paddle = new THREE.Mesh(geometry, material);
+		this.paddle.position = cposition;
+		scene.add(this.paddle);
+		game.obstacles.push(this.paddle);
 	};
 
 	this.setOpponent = function(o) {
@@ -451,7 +473,7 @@ function Player() {
 
 	this.makePlacar = function() {
 		var alert_position = 'right';
-		if(this.cube.position.x < 0){
+		if(this.paddle.position.x < 0){
 			alert_position = 'left';
 		}
 		var type = 'highlight'; //highlight ou error
@@ -463,9 +485,9 @@ function Player() {
 		$("body").append(placarHtml);
 		this.label_placar = $('#placar_label_' + alert_position);
 		if(alert_position == 'left'){
-			this.label_placar.parent().css({left: -this.cube.position.x-50});
+			this.label_placar.parent().css({left: -this.paddle.position.x-50});
 		}else{
-			this.label_placar.parent().css({right: this.cube.position.x-50});
+			this.label_placar.parent().css({right: this.paddle.position.x-50});
 		}
 		this.label_placar.html('0');
 	};
@@ -500,11 +522,11 @@ function Player() {
 		var wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x2779aa, wireframe: true, transparent: true } ); 
 		var geometry = new THREE.CubeGeometry(20, 20, 20);
 		var shape = THREE.SceneUtils.createMultiMaterialObject( geometry, [ darkMaterial, wireframeMaterial ] );
-		shape.position.set(this.cube.position.x*1.3, ((this.bonus_list.length)*21)+3, -game.limit_z-10);
+		shape.position.set(this.paddle.position.x*1.3, ((this.bonus_list.length)*21)+3, -game.limit_z-10);
 		shape.doubleSided = true;
 		game.scene.add(shape);
 
-		/*var cposition = new THREE.Vector3(this.cube.position.x, ((this.bonus_list.length-1)*21)+2, -game.limit_z-10);
+		/*var cposition = new THREE.Vector3(this.paddle.position.x, ((this.bonus_list.length-1)*21)+2, -game.limit_z-10);
                 var geometry = new THREE.CubeGeometry(20,20,20);
                 //var material = new THREE.MeshLambertMaterial({map: new THREE.Texture(x), color: 0x000000, wireframe: true});
                 var material = new THREE.MeshLambertMaterial({map: new THREE.Texture(x)});
@@ -513,18 +535,18 @@ function Player() {
                         material = new THREE.MeshBasicMaterial({map: new THREE.Texture(x)});
 			material.map.needsUpdate = true;
                 }
-                var cube = new THREE.Mesh(geometry, material);
-		cube.doubleSided = true;
-                cube.position = cposition;
-                game.scene.add(cube);*/
+                var paddle = new THREE.Mesh(geometry, material);
+		paddle.doubleSided = true;
+                paddle.position = cposition;
+                game.scene.add(paddle);*/
 
-		this.bonus_list.push({bonus: b, scene_cube: shape});
+		this.bonus_list.push({bonus: b, scene_paddle: shape});
 	};
 
 	this.getNextBonus = function() {
 		if(this.bonus_list.length > 0){
 			var node = this.bonus_list.shift();
-			game.scene.remove(node.scene_cube);
+			game.scene.remove(node.scene_paddle);
 
 			this.label_msg.html(BonusDescription[node.bonus.type]);
 
@@ -536,7 +558,7 @@ function Player() {
 
 	this.makeMsg = function() {
 		var alert_position = 'right';
-		if(this.cube.position.x < 0){
+		if(this.paddle.position.x < 0){
 			alert_position = 'left';
 		}
 		var type = 'highlight'; //highlight ou error
@@ -548,9 +570,9 @@ function Player() {
 		$("body").append(alertHtml);
 		this.label_msg = $('#msg_label_' + alert_position);
 		if(alert_position == 'left'){
-			this.label_msg.parent().css({left: -this.cube.position.x-230});
+			this.label_msg.parent().css({left: -this.paddle.position.x-230});
 		}else{
-			this.label_msg.parent().css({right: this.cube.position.x-230});
+			this.label_msg.parent().css({right: this.paddle.position.x-230});
 		}
 	};
 
@@ -566,8 +588,8 @@ function Player() {
 		}
 		this.bonus_list = [];
 
-		this.cube.position.z = 0;
-		this.cube.scale.z = 1;
+		this.paddle.position.z = 0;
+		this.paddle.scale.z = 1;
 	};
 }
 
@@ -591,19 +613,19 @@ function Bonus(player){
 		game.addSphere();
 	};
 	this.b2 = function(){
-		var size_current = player.cube.scale.z;
-		player.cube.scale.z = player.cube.scale.z * 2;
+		var size_current = player.paddle.scale.z;
+		player.paddle.scale.z = player.paddle.scale.z * 2;
 
 		setTimeout(function(){
-			player.cube.scale.z = size_current;
+			player.paddle.scale.z = size_current;
 		}, 10000);
 	};
 	this.b3 = function(){
-		var size_current = player.opponent.cube.scale.z;
-                player.opponent.cube.scale.z = player.opponent.cube.scale.z / 2;
+		var size_current = player.opponent.paddle.scale.z;
+                player.opponent.paddle.scale.z = player.opponent.paddle.scale.z / 2;
 
                 setTimeout(function(){
-                        player.opponent.cube.scale.z = size_current;
+                        player.opponent.paddle.scale.z = size_current;
                 }, 10000);
 	};
 	this.b4 = function(){
@@ -619,19 +641,19 @@ function Bonus(player){
 		}, 15000);
 	};
 	this.b6 = function(){
-		var speed_current = player.opponent.speed_cube;
-                player.opponent.speed_cube = 0;
+		var speed_current = player.opponent.speed_paddle;
+                player.opponent.speed_paddle = 0;
 
                 setTimeout(function(){
-                        player.opponent.speed_cube = speed_current;
+                        player.opponent.speed_paddle = speed_current;
                 }, 5000);
 	};
 	this.b7 = function(){
-		var speed_current = player.speed_cube;
-		player.speed_cube = player.speed_cube * 2;
+		var speed_current = player.speed_paddle;
+		player.speed_paddle = player.speed_paddle * 2;
 
 		setTimeout(function(){
-			player.speed_cube = speed_current;
+			player.speed_paddle = speed_current;
 		}, 15000);
 	};
 	this.b8 = function(){
