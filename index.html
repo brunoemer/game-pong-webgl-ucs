@@ -1,0 +1,788 @@
+<html>
+<head>
+<title>Pong Game WebGL- Computação gráfica</title> 
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+
+<link href="jquery-ui-1.10.4.custom/css/cupertino/jquery-ui-1.10.4.custom.css" rel="stylesheet">
+<script src="jquery-ui-1.10.4.custom/js/jquery-1.10.2.js"></script>
+<script src="jquery-ui-1.10.4.custom/js/jquery-ui-1.10.4.custom.js"></script>
+
+<script type="text/javascript" src="three.js-master/build/three.js"></script>
+<script type="text/javascript" src="js/OrbitControls.js"></script> 
+<script type="text/javascript" src="js/Detector.js"></script> 
+<script type="text/javascript" src="js/libs/stats.min.js"></script>
+
+<style type="text/css">
+	body { 
+		margin: 0px; 
+		padding: 0px;
+		font-size: 12px;
+	}
+	canvas { 
+		width: 100%; 
+		height: 100%
+	}
+	.placar { 
+		position: absolute; 
+		width: 80px; 
+		height: 20px; 
+		top: 0px; 
+		text-align: center;
+		padding-top: 5px;
+	}
+	.msg {
+		position: absolute; 
+		width: 400px; 
+		height: 20px; 
+		bottom: 0px; 
+		text-align: left; 
+		overflow: hidden;
+		padding-top: 5px;
+	}
+	.timer { 
+		position: absolute; 
+		width: 80px; 
+		height: 20px; 
+		top: 0px; 
+		left: 50%; 
+		margin-left: -40px;
+		text-align: center; 
+		padding-top: 5px;
+	}
+	.screen {
+		position: absolute; 
+		width: 600px; 
+		height: 500px; 
+		top: 50%; 
+		left: 50%; 
+		margin-left: -300px; 
+		margin-top: -250px; 
+		background-color: #ffffff; 
+		text-align: left; 
+		padding: 5px;
+	}
+	#accordion {
+		position: absolute; 
+		width: 600px; 
+		height: 350px;
+		top: 50px;
+		left: 50%; 
+		margin-left: -300px;
+		display: none;
+	}
+</style>
+
+<script type="text/javascript">
+var game;
+$(document).ready(function() {
+	game = new Game();
+	game.init();
+
+	//accordion
+	$("#accordion").accordion({collapsible: true, heightStyle: "content"});
+	$("#accordion_button")
+		.button()
+		.click(function( event ) {
+			game.start();
+			$("#accordion").hide();
+		});
+
+	var bonus_html = "Tipos:<br>";
+	for(i in BonusDescription){
+		bonus_html += i + " - " + BonusDescription[i] + '<br>';
+	}
+	$("#accordion_bonus").html(bonus_html);
+
+	$("#accordion").show();
+
+});
+
+function Game() {
+	this.speed = 5;
+	this.limit_x = 280;
+	this.limit_z = 200;
+	this.width = window.innerWidth;
+	this.height = window.innerHeight;
+	this.scene = new THREE.Scene();
+	this.camera = new THREE.PerspectiveCamera(30, this.width / this.height, 0.1, 20000);
+	this.renderer;
+	this.webgl_available = Detector.webgl;
+	this.controls;
+	this.stats;
+	this.key = [];
+	this.spheres = [];
+	this.direction_x = []; //0 left, 1 right
+	this.direction_z = []; //0 top, 1 down
+	this.direction_y = []; //-1 none, 0 top, 1 down
+	this.p1 = new Player();
+	this.p2 = new Player();
+	this.timer = new Timer();
+	this.obstacles = [];
+	this.audio;
+
+	this.init = function() {
+		var container = $('#container');
+		// render
+		if ( this.webgl_available ){
+			this.renderer = new THREE.WebGLRenderer( {antialias:true} );
+		}else{
+			this.renderer = new THREE.CanvasRenderer(); 
+		}
+		this.renderer.setSize(this.width, this.height);
+		container.append(this.renderer.domElement);
+
+		// camera
+		this.camera.position.set(0,500,700);
+		if(!this.webgl_available){
+			this.camera.position.set(0,800,0);
+		}
+		this.scene.add(this.camera);
+		this.camera.lookAt(this.scene.position);
+
+		// controls
+		this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+		this.controls.noKeys = true;
+
+		// light
+		var ambientLight = new THREE.AmbientLight(0x222222);
+		this.scene.add(ambientLight);
+		var directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+		directionalLight.position.set(0, 10, 3).normalize();
+		this.scene.add(directionalLight);
+
+		// floor
+		var floorMaterial = new THREE.MeshLambertMaterial( { color: 0x444444, side: THREE.DoubleSide } );
+		var floorGeometry = new THREE.PlaneGeometry(this.limit_x*2, this.limit_z*2, 1, 1);
+		var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+		floor.position.y = -8;
+		floor.rotation.x = Math.PI / 2;
+		this.scene.add(floor);
+		/*var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard.jpg' );
+		floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+		floorTexture.repeat.set( 10, 10 );
+		var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+		var floorGeometry = new THREE.PlaneGeometry(this.limit_x*2, this.limit_z*2, 1, 1);
+		var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+		floor.position.y = -8;
+		floor.rotation.x = Math.PI / 2;
+		this.scene.add(floor);*/
+		//laterais
+		var material = new THREE.MeshLambertMaterial( { color: 0x444444, side: THREE.DoubleSide } );
+		var geometry = new THREE.PlaneGeometry(this.limit_x*2, 16, 1, 1);
+		var side1 = new THREE.Mesh(geometry, material);
+		side1.position.z = -this.limit_z;
+		side1.rotation.x = Math.PI;
+		this.scene.add(side1);
+		var material = new THREE.MeshLambertMaterial( { color: 0x444444, side: THREE.DoubleSide } );
+		var geometry = new THREE.PlaneGeometry(this.limit_x*2, 16, 1, 1);
+		var side2 = new THREE.Mesh(geometry, material);
+		side2.position.z = this.limit_z;
+		side2.rotation.x = Math.PI;
+		this.scene.add(side2);
+
+		// sky
+		var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
+		var skyBoxMaterial = new THREE.MeshBasicMaterial( { color: 0xb6d1ff, side: THREE.BackSide } );
+		var skyBox = new THREE.Mesh(skyBoxGeometry, skyBoxMaterial);
+		this.scene.add(skyBox);
+
+		// stats - fps
+		this.stats = new Stats();
+		this.stats.domElement.style.position = 'absolute';
+		this.stats.domElement.style.top = '0px';
+		container.append(this.stats.domElement);
+
+		// paddles
+		this.p1.makePaddle(-230, this.scene);
+		this.p2.makePaddle(230, this.scene);
+		this.p1.setOpponent(this.p2);
+		this.p2.setOpponent(this.p1);
+
+		//audio
+		this.audio = document.createElement('audio');
+		this.audio.setAttribute('src', 'audio/Metal_Cling_Hit.mp3');
+
+		// events
+		(function(obj){
+			document.body.onkeydown = document.body.onkeyup = function(e){
+				var e = e || event;
+				var keyCode = (e.keyCode ? e.keyCode : e.which);
+				obj.key[keyCode] = e.type == 'keydown';
+			};
+		})(this);
+		(function(obj){
+			document.body.onkeypress = function(e){
+				var keyCode = (e.keyCode ? e.keyCode : e.which);
+				if(obj.spheres.length > 0){
+					if(keyCode == 97){ //a - usa bonus
+						var b = obj.p1.getNextBonus();
+						if(b){
+							b.start();
+						}
+					}
+					if(keyCode == 106){ //j - usa bonus
+						var b = obj.p2.getNextBonus();
+						if(b){
+							b.start();
+						}
+					}
+				}
+			};
+		})(this);
+		(function(obj){
+			obj.renderer.domElement.addEventListener('mouseup', function(event){
+				obj.addSphere();
+			});
+		})(this);
+
+		this.renderer.render(this.scene, this.camera);
+
+		// objects
+		this.p1.makePlacar();
+		this.p2.makePlacar();
+		this.p1.makeMsg();
+		this.p2.makeMsg();
+		this.timer = new Timer();
+		this.timer.init();
+	};
+
+	this.start = function() {
+		this.p1.clear();
+		this.p2.clear();
+
+		this.timer.clear();
+		this.timer.start();
+
+		// sphere
+		this.addSphere();
+
+		this.animate();
+	};
+
+	this.addSphere = function() {
+		var rad = 7;
+		var sposition = new THREE.Vector3(0, 0, 0);
+		var geometry = new THREE.SphereGeometry(rad, 30, 30);
+		var material = new THREE.MeshLambertMaterial({color: 0xD7EBF9});
+		if(!this.webgl_available){
+			material = new THREE.MeshBasicMaterial({color: 0xD7EBF9});
+		}
+		var sphere = new THREE.Mesh(geometry, material); 
+		sphere.position = sposition;
+		this.scene.add(sphere);
+		//this.obstacles.push(sphere);
+
+		var len = this.spheres.push(sphere) - 1;
+		this.direction_x[len] = Math.round(Math.random());
+		this.direction_z[len] = Math.round(Math.random());
+		this.direction_y[len] = 0;
+	};
+
+	this.animate = function() {
+		if(this.spheres.length > 0){
+			(function(obj){
+				requestAnimationFrame(function(){
+					obj.animate();
+				});
+			})(this);
+			this.update();
+			this.controls.update();
+			this.stats.update();
+			this.renderer.render(this.scene, this.camera);
+		}else{
+			this.timer.stop();
+			this.p1.label_msg.parent().addClass('ui-state-error');
+			this.p2.label_msg.parent().addClass('ui-state-error');
+			if(this.p1.points > this.p2.points){
+				this.p1.label_msg.html("Você ganhou!");
+				this.p2.label_msg.html("Você perdeu!");
+			}else if(this.p1.points < this.p2.points){
+				this.p1.label_msg.html("Você perdeu!");
+				this.p2.label_msg.html("Você ganhou!");
+			}else{
+				this.p1.label_msg.html("Ninguém ganhou!");
+				this.p2.label_msg.html("Ninguém ganhou!");
+			}
+
+			$("#accordion").show();
+		}
+	};
+
+	this.update = function() {
+
+//		console.log(this.p2.paddle.position.z-(this.p2.paddle.scale.z*this.p2.paddle_width_z/2) +'>'+ (-this.limit_z)); //cima
+//		console.log(this.p2.paddle.position.z+(this.p2.paddle.scale.z*this.p2.paddle_width_z/2) +'<'+ this.limit_z); //baixo
+
+		// events keys
+		// player 1
+		if(this.key[87]){ //w cima
+			if(this.p1.paddle.position.z-(this.p1.paddle.scale.z*this.p1.paddle_width_z/2) > -this.limit_z){
+				this.p1.paddle.position.z -= this.p1.speed_paddle;
+			}
+		}else if(this.key[83]){ //s baixo
+			if(this.p1.paddle.position.z+(this.p1.paddle.scale.z*this.p1.paddle_width_z/2) < this.limit_z){
+				this.p1.paddle.position.z += this.p1.speed_paddle;
+			}
+		}
+		// player 2
+		if(this.key[73]){ //i cima
+			if(this.p2.paddle.position.z-(this.p2.paddle.scale.z*this.p2.paddle_width_z/2) > -this.limit_z){
+				this.p2.paddle.position.z -= this.p2.speed_paddle;
+			}
+		}else if(this.key[75]){ //k baixo
+			if(this.p2.paddle.position.z+(this.p2.paddle.scale.z*this.p2.paddle_width_z/2) < this.limit_z){
+				this.p2.paddle.position.z += this.p2.speed_paddle;
+			}
+		}
+		//if(this.key[81]){ //q
+		//	this.p2.paddle.rotation.y += .1;
+		//}
+		//if(this.key[69]){ //e
+		//	this.p2.paddle.rotation.y -= .1;
+		//}
+
+		var rays = [
+			new THREE.Vector3(0, 0, 1), //down
+			new THREE.Vector3(1, 0, 1), //right down
+			new THREE.Vector3(1, 0, 0), //right
+			new THREE.Vector3(1, 0, -1), //right up
+			new THREE.Vector3(0, 0, -1), //up
+			new THREE.Vector3(-1, 0, -1), //left up
+			new THREE.Vector3(-1, 0, 0), //left
+			new THREE.Vector3(-1, 0, 1) //left down
+		];
+		var caster = new THREE.Raycaster();
+		var collisions;
+		var distance = 5;
+
+		// sphere move
+		var i, s;
+		for(i in this.spheres){
+			if(this.direction_x[i] == 1){
+				this.spheres[i].position.x += this.speed;
+			}else if(this.direction_x[i] == 0){
+				this.spheres[i].position.x -= this.speed;
+			}else if(this.direction_y[i] == 1){
+				this.spheres[i].position.y -= this.speed*3;
+			}
+			if(this.direction_z[i] == 1){
+				this.spheres[i].position.z += this.speed;
+			}else if(this.direction_z[i] == 0){
+				this.spheres[i].position.z -= this.speed;
+			}
+
+			// borda direita
+			if(this.spheres[i].position.x >= this.limit_x && this.direction_y[i] == 0){
+				this.direction_y[i] = 1;
+				this.direction_x[i] = -1;
+				this.direction_z[i] = -1;
+				this.p1.makePoint();
+			// borda esquerda
+			}else if(this.spheres[i].position.x <= -this.limit_x && this.direction_y[i] == 0){
+				this.direction_y[i] = 1;
+				this.direction_x[i] = -1;
+				this.direction_z[i] = -1;
+				this.p2.makePoint();
+			}
+			// bordas superior e inferior
+			if(this.spheres[i].position.z >= this.limit_z-10 || this.spheres[i].position.z <= -this.limit_z+10){
+				this.direction_z[i] = this.direction_z[i] != 1?1:0;
+			}
+			// cair
+			if(this.direction_y[i] == 1 && this.spheres[i].position.y < -2000){
+				s = this.spheres[i];
+				this.spheres.splice(i, 1);
+				this.direction_x.splice(i, 1);
+				this.direction_y.splice(i, 1);
+				this.direction_z.splice(i, 1);
+				//delete this.spheres[i];
+				this.scene.remove(s);
+			}
+
+			if(this.spheres[i] != undefined){
+				// colisao
+				for (var j = 0; j < rays.length; j++) {
+					caster.set(this.spheres[i].position, rays[j]);
+					collisions = caster.intersectObjects(this.obstacles);
+					if (collisions.length > 0 && collisions[0].distance <= distance) {
+						if (j == 0 || j == 4) { //paddle up ou down
+							this.direction_z[i] = this.direction_z[i] != 1?1:0;
+							this.audio.play();
+						}
+						if (j != 0 && j != 4) { // left ou right
+							this.direction_x[i] = this.direction_x[i] != 1?1:0;
+							this.audio.play();
+						}
+					}
+				}
+			}
+		}
+
+/*
+Computer.prototype.update = function(ball) {
+  var x_pos = ball.x;
+  var diff = -((this.paddle.x + (this.paddle.width / 2)) - x_pos);
+  if(diff < 0 && diff < -4) { // max speed left
+    diff = -5;
+  } else if(diff > 0 && diff > 4) { // max speed right
+    diff = 5;
+  }
+  this.paddle.move(diff, 0);
+  if(this.paddle.x < 0) {
+    this.paddle.x = 0;
+  } else if (this.paddle.x + this.paddle.width > 400) {
+    this.paddle.x = 400 - this.paddle.width;
+  }
+};
+*/
+
+	}
+}
+
+function Player() {
+	this.paddle;
+	this.paddle_width_z = 100;
+	this.speed_paddle = 5;
+	this.points = 0;
+	this.label_placar;
+	this.bonus_list = [];
+	this.opponent;
+	this.label_msg;
+
+	this.makePaddle = function(position_x, scene) {
+		//var cposition = new THREE.Vector3(position_x+(position_x > 0?-204:204), 3, 80);
+		var cposition = new THREE.Vector3(position_x, 3, 0);
+		var geometry = new THREE.CubeGeometry(10,20,this.paddle_width_z);
+		var material = new THREE.MeshLambertMaterial({color: 0x2779aa, opacity: 0.5});
+		if(!game.webgl_available){
+			material = new THREE.MeshBasicMaterial({color: 0x2779aa});
+		}
+		this.paddle = new THREE.Mesh(geometry, material);
+		this.paddle.position = cposition;
+		scene.add(this.paddle);
+		game.obstacles.push(this.paddle);
+	};
+
+	this.setOpponent = function(o) {
+		this.opponent = o;
+	};
+
+	this.getOpponent = function() {
+		return this.opponent;
+	};
+
+	this.makePlacar = function() {
+		var alert_position = 'right';
+		if(this.paddle.position.x < 0){
+			alert_position = 'left';
+		}
+		var type = 'highlight'; //highlight ou error
+		var placarHtml = 
+			'<div class="ui-state-' + type + ' ui-corner-all placar">' +
+			'<span class="ui-icon ui-icon-' + (type === 'highlight' ? 'info' : 'alert') + '" style="float:left;margin-right: .3em;"></span>' +
+			'<div id="placar_label_' + alert_position + '"></div>' +
+			'</div>';
+		$("body").append(placarHtml);
+		this.label_placar = $('#placar_label_' + alert_position);
+		if(alert_position == 'left'){
+			this.label_placar.parent().css({left: -this.paddle.position.x-50});
+		}else{
+			this.label_placar.parent().css({right: this.paddle.position.x-50});
+		}
+		this.label_placar.html('0');
+	};
+
+	this.makePoint = function() {
+		this.points++;
+
+		// gera bonus a cada 3 pontos
+		if(this.points % 3 == 0){
+			this.createBonus();
+		}
+
+		this.label_placar.html(this.points);
+	};
+
+	this.createBonus = function() {
+		var b = new Bonus(this);
+
+		//adiciona cubo na tela
+		var x = document.createElement("canvas");
+		var xc = x.getContext("2d");
+		x.width = x.height = 90;
+		//xc.shadowColor = "#ffffff";
+		//xc.shadowBlur = 7;
+		xc.font = "bold 70px arial";
+		xc.textAlign = "center";
+		xc.fillStyle = "#000000";
+		xc.fillText(b.type, 40, 70);
+
+		var darkMaterial = new THREE.MeshLambertMaterial( { map: new THREE.Texture(x), transparent: true } );
+		darkMaterial.map.needsUpdate = true;
+		var wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x2779aa, wireframe: true, transparent: true } ); 
+		var geometry = new THREE.CubeGeometry(20, 20, 20);
+		var shape = THREE.SceneUtils.createMultiMaterialObject( geometry, [ darkMaterial, wireframeMaterial ] );
+		shape.position.set(this.paddle.position.x*1.3, ((this.bonus_list.length)*21)+3, -game.limit_z-10);
+		shape.doubleSided = true;
+		game.scene.add(shape);
+
+		/*var cposition = new THREE.Vector3(this.paddle.position.x, ((this.bonus_list.length-1)*21)+2, -game.limit_z-10);
+                var geometry = new THREE.CubeGeometry(20,20,20);
+                //var material = new THREE.MeshLambertMaterial({map: new THREE.Texture(x), color: 0x000000, wireframe: true});
+                var material = new THREE.MeshLambertMaterial({map: new THREE.Texture(x)});
+		material.map.needsUpdate = true;
+                if(!game.webgl_available){
+                        material = new THREE.MeshBasicMaterial({map: new THREE.Texture(x)});
+			material.map.needsUpdate = true;
+                }
+                var paddle = new THREE.Mesh(geometry, material);
+		paddle.doubleSided = true;
+                paddle.position = cposition;
+                game.scene.add(paddle);*/
+
+		this.bonus_list.push({bonus: b, scene_paddle: shape});
+	};
+
+	this.getNextBonus = function() {
+		if(this.bonus_list.length > 0){
+			var node = this.bonus_list.shift();
+			game.scene.remove(node.scene_paddle);
+
+			this.label_msg.html(BonusDescription[node.bonus.type]);
+
+			return node.bonus;
+		}else{
+			this.label_msg.html("Sem bonus para utilizar");
+		}
+	};
+
+	this.makeMsg = function() {
+		var alert_position = 'right';
+		if(this.paddle.position.x < 0){
+			alert_position = 'left';
+		}
+		var type = 'highlight'; //highlight ou error
+		var alertHtml = 
+			'<div class="ui-state-' + type + ' ui-corner-all msg">' +
+			'<span class="ui-icon ui-icon-' + (type === 'highlight' ? 'info' : 'alert') + '" style="float:left;margin-right: .3em;"></span>' +
+			'<div id="msg_label_' + alert_position + '"></div>' +
+			'</div>';
+		$("body").append(alertHtml);
+		this.label_msg = $('#msg_label_' + alert_position);
+		if(alert_position == 'left'){
+			this.label_msg.parent().css({left: -this.paddle.position.x-230});
+		}else{
+			this.label_msg.parent().css({right: this.paddle.position.x-230});
+		}
+	};
+
+	this.clear = function() {
+		this.points = 0;
+		this.label_placar.html('0');
+
+		this.label_msg.parent().removeClass('ui-state-error');
+		this.label_msg.html('');
+
+		for(i in this.bonus_list){
+			game.scene.remove(this.bonus_list[i].scene_cube);
+		}
+		this.bonus_list = [];
+
+		this.paddle.position.z = 0;
+		this.paddle.scale.z = 1;
+	};
+}
+
+function Bonus(player){
+	this.player = player;
+	this.type = Math.floor(Math.random() * 11);
+
+	this.start = function(){
+		eval("this.b" + this.type)();
+	};
+
+	this.b0 = function(){
+		var speed_current = game.speed;
+		game.speed = game.speed * 1/2;
+
+		setTimeout(function(){
+			game.speed = speed_current;
+		}, 15000);
+	};
+	this.b1 = function(){
+		game.addSphere();
+	};
+	this.b2 = function(){
+		var size_current = player.paddle.scale.z;
+		player.paddle.scale.z = player.paddle.scale.z * 2;
+
+		setTimeout(function(){
+			player.paddle.scale.z = size_current;
+		}, 10000);
+	};
+	this.b3 = function(){
+		var size_current = player.opponent.paddle.scale.z;
+                player.opponent.paddle.scale.z = player.opponent.paddle.scale.z / 2;
+
+                setTimeout(function(){
+                        player.opponent.paddle.scale.z = size_current;
+                }, 10000);
+	};
+	this.b4 = function(){
+		game.addSphere();
+		game.addSphere();
+	};
+	this.b5 = function(){
+		var speed_current = game.speed;
+		game.speed = game.speed * 2;
+
+		setTimeout(function(){
+			game.speed = speed_current;
+		}, 15000);
+	};
+	this.b6 = function(){
+		var speed_current = player.opponent.speed_paddle;
+                player.opponent.speed_paddle = 0;
+
+                setTimeout(function(){
+                        player.opponent.speed_paddle = speed_current;
+                }, 5000);
+	};
+	this.b7 = function(){
+		var speed_current = player.speed_paddle;
+		player.speed_paddle = player.speed_paddle * 2;
+
+		setTimeout(function(){
+			player.speed_paddle = speed_current;
+		}, 15000);
+	};
+	this.b8 = function(){
+		game.addSphere();
+		game.addSphere();
+		game.addSphere();
+	};
+	this.b9 = function(){
+		for(i in game.direction_x){
+			if(game.direction_x[i] == 0){
+				game.direction_x[i] = 1;
+			}else if(game.direction_x[i] == 1){
+				game.direction_x[i] = 0;
+			}
+		}
+	};
+	this.b10 = function(){
+		this.start();
+		this.start();
+	};
+}
+
+var BonusDescription = [
+	"Diminui velocidade das bolinhas por 15 seg",
+	"Cria uma bolinha",
+	"Aumenta tamanho do cubo por 10 seg",
+	"Reduz tamanho do cubo do adversario por 10 seg",
+	"Cria 2 bolinhas",
+	"Aumenta velocidade das bolinhas por 15 seg",
+	"Trava cubo do adversario por 5 seg",
+	"Aumenta velocidade do cubo por 15 seg",
+	"Cria 3 bolinhas",
+	"Muda direcao das bolinhas",
+	"Ganha 2 bonus aleatórios"
+];
+
+function Timer() {
+	this.totalSeconds = 0;
+	this.timer;
+	this.label;
+
+	this.init = function() {
+		/*var timerHtml = 
+			'<div class="ui-widget ui-widget-content ui-corner-all timer">' +
+				'<div class="ui-dialog-content ui-widget-content" style="background: none; border: 0;">' +
+					'<div id="timer_label"></div>' +
+				'</div>' +
+			'</div>';
+		$("body").append(timerHtml);
+		this.label = $('#timer_label');*/
+
+		var type = 'highlight'; //highlight ou error
+		var timerHtml = 
+			'<div class="ui-state-' + type + ' ui-corner-all timer">' +
+			'<span class="ui-icon ui-icon-' + (type === 'highlight' ? 'info' : 'alert') + '" style="float:left;margin-right: .3em;"></span>' +
+			'<div id="timer_label"></div>' +
+			'</div>';
+		$("body").append(timerHtml);
+		this.label = $('#timer_label');
+		this.label.html('00:00');
+	};
+
+	this.start = function() {
+		(function(obj){
+			obj.timer = setInterval(function(){
+				obj.setTimeUpdate();
+			}, 1000);
+		})(this);
+	};
+
+	this.stop = function() {
+		clearInterval(this.timer);
+	};
+
+	this.setTimeUpdate = function() {
+		++this.totalSeconds;
+		var m = this.padstr(parseInt(this.totalSeconds / 60));
+		var s = this.padstr(this.totalSeconds % 60);
+		this.label.html(m + ":" + s);
+
+		// gera bonus a cada 30 seg
+		if(s == 0 || s == 30){
+			game.p1.createBonus();
+			game.p2.createBonus();
+		}
+	};
+
+	this.clear = function() {
+		this.totalSeconds = 0;
+		this.label.html('00:00');
+	};
+
+	this.padstr = function(val) {
+		var valString = val + "";
+		if(valString.length < 2) {
+			return "0" + valString;
+		} else {
+			return valString;
+		}
+	};
+}
+
+</script> 
+</head> 
+<body>
+	<div id="container"></div>
+
+	<div id="accordion">
+		<h3>Instruções</h3>
+		<div>
+			<b>Player 1:</b><br>
+			Tecla 'w'/'s' para movimentar<br>
+			Tecla 'a' para usar os bonus<br>
+			<b>Player 2:</b><br>
+			Tecla 'i'/'k' para movimentar<br>
+			Tecla 'j' para usar os bonus<br>
+			<br>
+			Mouse para mover tela
+		</div>
+		<h3>Regras</h3>
+		<div>
+			-Cria bonus para os players a cada 30 sec<br>
+			-Gera um bonus para um player a cada 3 pontos ganhos<br>
+		</div>
+		<h3>Lista dos bonus</h3>
+		<div id="accordion_bonus"></div>
+		<h3>Iniciar o jogo</h3>
+		<div><button id="accordion_button">Iniciar</button></div>
+	</div>
+
+</body> 
+</html>
